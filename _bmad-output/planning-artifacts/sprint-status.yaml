@@ -1,0 +1,106 @@
+# generated: 2026-02-07
+# project: bmad-simple-app
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-02-07
+project: bmad-simple-app
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts/stories
+
+development_status:
+  # Epic 1: Project Foundation & User Access
+  epic-1: in-progress
+  1-1-initialize-monorepo-project-structure: ready-for-dev
+  1-2-create-landing-page-with-login-form: backlog
+  1-3-implement-page-header-with-user-info-and-logout: backlog
+  1-4-configure-and-verify-production-deployment: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Protocol Ingestion Pipeline
+  epic-2: backlog
+  2-1-implement-pdf-upload-and-text-extraction: backlog
+  2-2-implement-protocol-chunking-and-vector-indexing: backlog
+  2-3-create-protocol-list-endpoint: backlog
+  2-4-build-protocol-upload-ui: backlog
+  2-5-build-protocol-selection-ui: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Intelligent Outline Generation
+  epic-3: backlog
+  3-1-implement-outline-generation-endpoint: backlog
+  3-2-build-outline-checklist-ui: backlog
+  3-3-implement-outline-confirmation-flow: backlog
+  3-4-navigate-back-to-outline-from-dashboard: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Section Generation & Streaming
+  epic-4: backlog
+  4-1-implement-section-generation-streaming-endpoint: backlog
+  4-2-build-section-dashboard-layout: backlog
+  4-3-implement-section-card-with-streaming-display: backlog
+  4-4-implement-error-handling-and-retry: backlog
+  4-5-handle-outline-modifications: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Section Review Workflow
+  epic-5: backlog
+  5-1-implement-section-approve-action: backlog
+  5-2-implement-inline-section-editing: backlog
+  5-3-implement-section-regeneration-endpoint: backlog
+  5-4-build-regenerate-modal-with-guidance-input: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Approval Tracking & Audit
+  epic-6: backlog
+  6-1-display-approval-information-on-section-cards: backlog
+  6-2-track-re-approval-after-edits: backlog
+  6-3-implement-approve-all-sections-button: backlog
+  6-4-build-action-bar-with-progress-display: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Project Persistence
+  epic-7: backlog
+  7-1-define-project-file-format-and-state-structure: backlog
+  7-2-implement-save-project-to-local-file: backlog
+  7-3-implement-load-project-from-local-file: backlog
+  7-4-wire-up-landing-page-project-actions: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: Export & Delivery
+  epic-8: backlog
+  8-1-implement-export-endpoint-with-format-conversion: backlog
+  8-2-generate-approval-tracking-page: backlog
+  8-3-wire-up-export-buttons-and-download: backlog
+  epic-8-retrospective: optional
