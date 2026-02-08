@@ -84,6 +84,7 @@ User settings in `_bmad/core/config.yaml`:
 - **Always create a new branch before starting any story**
 - **Never develop directly on `main`**
 - Branch naming: `story-X.Y-short-description` (e.g., `story-1.1-nextjs-setup`)
+- **Always use `git merge --no-ff`** to preserve branch history (no fast-forward)
 
 ### Testing Requirements
 
