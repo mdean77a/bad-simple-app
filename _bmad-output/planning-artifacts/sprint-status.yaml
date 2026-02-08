@@ -42,8 +42,8 @@ story_location: _bmad-output/implementation-artifacts/stories
 development_status:
   # Epic 1: Project Foundation & User Access
   epic-1: in-progress
-  1-1-initialize-monorepo-project-structure: ready-for-dev
-  1-2-create-landing-page-with-login-form: backlog
+  1-1-initialize-monorepo-project-structure: done
+  1-2-create-landing-page-with-login-form: done
   1-3-implement-page-header-with-user-info-and-logout: backlog
   1-4-configure-and-verify-production-deployment: backlog
   epic-1-retrospective: optional
