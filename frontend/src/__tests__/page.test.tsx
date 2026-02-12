@@ -36,7 +36,9 @@ describe("Home Page", () => {
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByText(/Welcome back, John Doe/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: /Welcome back, John Doe/i })
+      ).toBeInTheDocument();
     });
 
     expect(
@@ -54,7 +56,7 @@ describe("Home Page", () => {
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByText(/Welcome back/i)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name: /Welcome back/i })).toBeInTheDocument();
     });
 
     const newProjectButton = screen.getByRole("button", {
@@ -70,7 +72,7 @@ describe("Home Page", () => {
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByText(/Welcome back/i)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name: /Welcome back/i })).toBeInTheDocument();
     });
 
     const continueButton = screen.getByRole("button", {
@@ -96,9 +98,25 @@ describe("Home Page", () => {
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-        "ICF Generator"
-      );
+      expect(
+        screen.getByRole("heading", { level: 1, name: "ICF Generator" })
+      ).toBeInTheDocument();
     });
+  });
+
+  it("shows PageHeader with user name and logout on authenticated page", async () => {
+    const storedUser = { name: "John Doe", email: "john@example.com" };
+    localStorage.setItem("user", JSON.stringify(storedUser));
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(screen.getByRole("banner")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("John Doe")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /logout/i })
+    ).toBeInTheDocument();
   });
 });
