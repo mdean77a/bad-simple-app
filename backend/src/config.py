@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
     cors_origins: list[str] = ["http://localhost:3000"]
-    cors_origin_regex: str | None = r"https://bad-simple-app.*\.vercel\.app"
+    cors_origin_regex: str | None = r"https://bad-simple.*\.vercel\.app"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
