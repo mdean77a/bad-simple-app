@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import Home from "@/app/page";
 import { AuthProvider } from "@/lib/auth";
+import * as api from "@/lib/api";
+
+jest.mock("@/lib/api");
+const mockCheckHealth = api.checkHealth as jest.MockedFunction<typeof api.checkHealth>;
 
 const renderHome = () => {
   return render(
@@ -13,6 +17,7 @@ const renderHome = () => {
 describe("Home Page", () => {
   beforeEach(() => {
     localStorage.clear();
+    mockCheckHealth.mockResolvedValue({ status: "ok" });
   });
 
   it("shows login form when user is not logged in", async () => {
@@ -118,5 +123,40 @@ describe("Home Page", () => {
     expect(
       screen.getByRole("button", { name: /logout/i })
     ).toBeInTheDocument();
+  });
+
+  it("shows 'Backend connected' when health check succeeds", async () => {
+    const storedUser = { name: "John Doe", email: "john@example.com" };
+    localStorage.setItem("user", JSON.stringify(storedUser));
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(screen.getByText("Backend connected")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Backend unavailable' when health check fails", async () => {
+    mockCheckHealth.mockRejectedValue(new Error("Network error"));
+    const storedUser = { name: "John Doe", email: "john@example.com" };
+    localStorage.setItem("user", JSON.stringify(storedUser));
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(screen.getByText("Backend unavailable")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Checking backend...' initially", async () => {
+    mockCheckHealth.mockReturnValue(new Promise(() => {})); // never resolves
+    const storedUser = { name: "John Doe", email: "john@example.com" };
+    localStorage.setItem("user", JSON.stringify(storedUser));
+
+    renderHome();
+
+    await waitFor(() => {
+      expect(screen.getByText("Checking backend...")).toBeInTheDocument();
+    });
   });
 });
