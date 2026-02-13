@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { checkHealth } from "@/lib/api";
 
 function LoginPage() {
   return (
@@ -21,6 +23,41 @@ function LoginPage() {
           <LoginForm />
         </div>
       </div>
+    </div>
+  );
+}
+
+function BackendStatus() {
+  const [status, setStatus] = useState<"checking" | "connected" | "unavailable">("checking");
+
+  useEffect(() => {
+    checkHealth()
+      .then(() => setStatus("connected"))
+      .catch(() => setStatus("unavailable"));
+  }, []);
+
+  if (status === "checking") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+        <span className="h-2 w-2 rounded-full bg-slate-400" />
+        Checking backend...
+      </div>
+    );
+  }
+
+  if (status === "connected") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-green-700">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        Backend connected
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-red-700">
+      <span className="h-2 w-2 rounded-full bg-red-500" />
+      Backend unavailable
     </div>
   );
 }
@@ -80,6 +117,9 @@ function AuthenticatedLandingPage() {
           <p className="text-center text-sm text-slate-500">
             These options will be enabled in later versions.
           </p>
+          <div className="flex justify-center">
+            <BackendStatus />
+          </div>
         </div>
       </div>
     </div>
