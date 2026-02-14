@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -79,10 +80,9 @@ function AuthenticatedLandingPage() {
             </p>
           </div>
           <div className="space-y-4">
-            <button
-              disabled
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-4 font-medium text-white opacity-50 cursor-not-allowed"
-              aria-disabled="true"
+            <Link
+              href="/projects/new"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-4 font-medium text-white hover:bg-violet-700"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -97,7 +97,7 @@ function AuthenticatedLandingPage() {
                 />
               </svg>
               New Project
-            </button>
+            </Link>
             <button
               disabled
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-4 font-medium text-slate-700 opacity-50 cursor-not-allowed"
@@ -115,7 +115,7 @@ function AuthenticatedLandingPage() {
             </button>
           </div>
           <p className="text-center text-sm text-slate-500">
-            These options will be enabled in later versions.
+            Continue Saved Project will be enabled in a later version.
           </p>
           <div className="flex justify-center">
             <BackendStatus />

@@ -4,6 +4,11 @@ import { AuthProvider } from "@/lib/auth";
 import * as api from "@/lib/api";
 
 jest.mock("@/lib/api");
+jest.mock("next/link", () => {
+  return ({ children, href, ...rest }: { children: React.ReactNode; href: string; [key: string]: unknown }) => (
+    <a href={href} {...rest}>{children}</a>
+  );
+});
 const mockCheckHealth = api.checkHealth as jest.MockedFunction<typeof api.checkHealth>;
 
 const renderHome = () => {
@@ -47,14 +52,14 @@ describe("Home Page", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /new project/i })
+      screen.getByRole("link", { name: /new project/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /continue saved project/i })
     ).toBeInTheDocument();
   });
 
-  it("shows disabled New Project button on authenticated page", async () => {
+  it("shows New Project as an enabled link to /projects/new", async () => {
     const storedUser = { name: "John Doe", email: "john@example.com" };
     localStorage.setItem("user", JSON.stringify(storedUser));
 
@@ -64,10 +69,10 @@ describe("Home Page", () => {
       expect(screen.getByRole("heading", { level: 2, name: /Welcome back/i })).toBeInTheDocument();
     });
 
-    const newProjectButton = screen.getByRole("button", {
+    const newProjectLink = screen.getByRole("link", {
       name: /new project/i,
     });
-    expect(newProjectButton).toBeDisabled();
+    expect(newProjectLink).toHaveAttribute("href", "/projects/new");
   });
 
   it("shows disabled Continue Saved Project button on authenticated page", async () => {
