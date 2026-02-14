@@ -1,5 +1,9 @@
+from unittest.mock import patch
+
 import pymupdf
 import pytest
+
+from src.services.vector_store import VectorStoreError
 
 
 def _make_pdf(pages: list[str]) -> bytes:
@@ -14,7 +18,8 @@ def _make_pdf(pages: list[str]) -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_upload_valid_pdf(client):
+@patch("src.api.routes.protocols.index_protocol")
+async def test_upload_valid_pdf(mock_index, client):
     pdf_bytes = _make_pdf(["Protocol text content"])
     response = await client.post(
         "/api/v1/protocols/upload",
@@ -23,14 +28,16 @@ async def test_upload_valid_pdf(client):
 
     assert response.status_code == 200
     data = response.json()
-    assert "protocolId" in data
+    assert data["protocolId"].startswith("protocol_test_protocol_")
     assert data["protocolName"] == "test-protocol"
-    assert "Protocol text content" in data["textContent"]
-    assert data["pageCount"] == 1
+    assert "textContent" not in data
+    assert "pageCount" not in data
+    mock_index.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_upload_multi_page_pdf(client):
+@patch("src.api.routes.protocols.index_protocol")
+async def test_upload_multi_page_pdf(mock_index, client):
     pdf_bytes = _make_pdf(["Page 1", "Page 2", "Page 3"])
     response = await client.post(
         "/api/v1/protocols/upload",
@@ -38,7 +45,11 @@ async def test_upload_multi_page_pdf(client):
     )
 
     assert response.status_code == 200
-    assert response.json()["pageCount"] == 3
+    data = response.json()
+    assert "protocolId" in data
+    assert "protocolName" in data
+    assert "textContent" not in data
+    assert "pageCount" not in data
 
 
 @pytest.mark.asyncio
@@ -75,7 +86,8 @@ async def test_upload_corrupted_pdf(client):
 
 
 @pytest.mark.asyncio
-async def test_upload_response_has_protocol_id_format(client):
+@patch("src.api.routes.protocols.index_protocol")
+async def test_upload_response_has_protocol_id_format(mock_index, client):
     pdf_bytes = _make_pdf(["Content"])
     response = await client.post(
         "/api/v1/protocols/upload",
@@ -83,4 +95,39 @@ async def test_upload_response_has_protocol_id_format(client):
     )
 
     data = response.json()
-    assert data["protocolId"].startswith("my-protocol_")
+    assert data["protocolId"].startswith("protocol_my_protocol_")
+
+
+@pytest.mark.asyncio
+async def test_upload_empty_text_pdf(client):
+    """PDF that parses but has no extractable text returns PDF_PARSE_ERROR."""
+    doc = pymupdf.open()
+    doc.new_page()  # blank page, no text
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    response = await client.post(
+        "/api/v1/protocols/upload",
+        files={"file": ("empty.pdf", pdf_bytes, "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["code"] == "PDF_PARSE_ERROR"
+    assert "no extractable text" in data["detail"]
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.protocols.index_protocol")
+async def test_upload_vector_db_error(mock_index, client):
+    mock_index.side_effect = VectorStoreError("Connection refused")
+    pdf_bytes = _make_pdf(["Protocol text content"])
+    response = await client.post(
+        "/api/v1/protocols/upload",
+        files={"file": ("test.pdf", pdf_bytes, "application/pdf")},
+    )
+
+    assert response.status_code == 502
+    data = response.json()
+    assert data["code"] == "VECTOR_DB_ERROR"
+    assert "Connection refused" in data["detail"]
