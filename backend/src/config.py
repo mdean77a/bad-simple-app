@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     cors_origin_regex: str | None = r"https://bad-simple.*\.vercel\.app"
 
+    qdrant_url: str = ""
+    qdrant_api_key: str | None = None
+    openai_api_key: str | None = None
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: object) -> object:

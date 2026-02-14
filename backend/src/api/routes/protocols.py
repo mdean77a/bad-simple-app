@@ -1,24 +1,21 @@
-import re
-import time
+import asyncio
 
 from fastapi import APIRouter, UploadFile
+from fastapi.responses import JSONResponse
 
 from src.services.pdf_processor import PDFProcessingError, extract_text_from_pdf
+from src.services.vector_store import (
+    VectorStoreError,
+    generate_collection_name,
+    index_protocol,
+)
 
 router = APIRouter()
 
 
-def _generate_protocol_id(filename: str) -> str:
-    """Generate a protocol ID from filename + timestamp."""
-    name = filename.rsplit(".", 1)[0] if "." in filename else filename
-    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", name).strip("_")
-    timestamp = int(time.time() * 1000)
-    return f"{sanitized}_{timestamp}"
-
-
 @router.post("/upload")
 async def upload_protocol(file: UploadFile) -> dict:
-    """Upload a clinical protocol PDF and extract its text content."""
+    """Upload a clinical protocol PDF, extract text, and index in vector store."""
     filename = file.filename or "unknown.pdf"
 
     if not filename.lower().endswith(".pdf"):
@@ -30,33 +27,43 @@ async def upload_protocol(file: UploadFile) -> dict:
     file_bytes = await file.read()
 
     try:
-        text_content, page_count = extract_text_from_pdf(file_bytes)
+        text_content, _page_count = extract_text_from_pdf(file_bytes)
     except PDFProcessingError as exc:
         return _pdf_parse_error(str(exc))
 
     protocol_name = filename.rsplit(".", 1)[0] if "." in filename else filename
+    collection_name = generate_collection_name(filename)
+
+    if not text_content.strip():
+        return _pdf_parse_error("PDF contains no extractable text")
+
+    try:
+        await asyncio.to_thread(index_protocol, text_content, collection_name, protocol_name)
+    except VectorStoreError as exc:
+        return _vector_db_error(str(exc))
 
     return {
-        "protocolId": _generate_protocol_id(filename),
+        "protocolId": collection_name,
         "protocolName": protocol_name,
-        "textContent": text_content,
-        "pageCount": page_count,
     }
 
 
-def _validation_error(detail: str) -> dict:
-    from fastapi.responses import JSONResponse
-
+def _validation_error(detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"code": "VALIDATION_ERROR", "detail": detail},
     )
 
 
-def _pdf_parse_error(detail: str) -> dict:
-    from fastapi.responses import JSONResponse
-
+def _pdf_parse_error(detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"code": "PDF_PARSE_ERROR", "detail": detail},
+    )
+
+
+def _vector_db_error(detail: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=502,
+        content={"code": "VECTOR_DB_ERROR", "detail": detail},
     )
