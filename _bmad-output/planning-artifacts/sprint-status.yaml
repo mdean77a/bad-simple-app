@@ -52,10 +52,10 @@ development_status:
   epic-2: in-progress
   2-1-implement-pdf-upload-and-text-extraction: done
   2-2-implement-protocol-chunking-and-vector-indexing: done
-  2-3-create-protocol-list-endpoint: ready-for-dev
+  2-3-create-protocol-list-endpoint: done
   2-4-build-protocol-upload-ui: done
   2-5-build-protocol-selection-ui: backlog
-  2-6-add-protocol-acronym: ready-for-dev
+  2-6-add-protocol-acronym: done
   epic-2-retrospective: optional
 
   # Epic 3: Intelligent Outline Generation
