@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Form, UploadFile
 from fastapi.responses import JSONResponse
 
 from src.services.pdf_processor import PDFProcessingError, extract_text_from_pdf
@@ -14,8 +14,12 @@ router = APIRouter()
 
 
 @router.post("/upload")
-async def upload_protocol(file: UploadFile) -> dict:
+async def upload_protocol(file: UploadFile, acronym: str = Form(...)) -> dict:
     """Upload a clinical protocol PDF, extract text, and index in vector store."""
+    acronym = acronym.strip()
+    if len(acronym) < 5 or len(acronym) > 15:
+        return _validation_error("Acronym must be between 5 and 15 characters")
+
     filename = file.filename or "unknown.pdf"
 
     if not filename.lower().endswith(".pdf"):
@@ -38,13 +42,16 @@ async def upload_protocol(file: UploadFile) -> dict:
         return _pdf_parse_error("PDF contains no extractable text")
 
     try:
-        await asyncio.to_thread(index_protocol, text_content, collection_name, protocol_name)
+        await asyncio.to_thread(
+            index_protocol, text_content, collection_name, protocol_name, acronym
+        )
     except VectorStoreError as exc:
         return _vector_db_error(str(exc))
 
     return {
         "protocolId": collection_name,
         "protocolName": protocol_name,
+        "acronym": acronym,
     }
 
 

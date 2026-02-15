@@ -41,20 +41,21 @@ story_location: _bmad-output/implementation-artifacts/stories
 
 development_status:
   # Epic 1: Project Foundation & User Access
-  epic-1: in-progress
+  epic-1: done
   1-1-initialize-monorepo-project-structure: done
   1-2-create-landing-page-with-login-form: done
-  1-3-implement-page-header-with-user-info-and-logout: backlog
-  1-4-configure-and-verify-production-deployment: backlog
+  1-3-implement-page-header-with-user-info-and-logout: done
+  1-4-configure-and-verify-production-deployment: done
   epic-1-retrospective: optional
 
   # Epic 2: Protocol Ingestion Pipeline
-  epic-2: backlog
-  2-1-implement-pdf-upload-and-text-extraction: backlog
-  2-2-implement-protocol-chunking-and-vector-indexing: backlog
-  2-3-create-protocol-list-endpoint: backlog
-  2-4-build-protocol-upload-ui: backlog
+  epic-2: in-progress
+  2-1-implement-pdf-upload-and-text-extraction: done
+  2-2-implement-protocol-chunking-and-vector-indexing: done
+  2-3-create-protocol-list-endpoint: ready-for-dev
+  2-4-build-protocol-upload-ui: done
   2-5-build-protocol-selection-ui: backlog
+  2-6-add-protocol-acronym: ready-for-dev
   epic-2-retrospective: optional
 
   # Epic 3: Intelligent Outline Generation

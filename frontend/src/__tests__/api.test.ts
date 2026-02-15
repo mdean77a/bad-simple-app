@@ -57,10 +57,11 @@ describe("uploadProtocol", () => {
     jest.resetAllMocks();
   });
 
-  it("sends FormData and returns result on success", async () => {
+  it("sends FormData with file and acronym on success", async () => {
     const mockResponse = {
       protocolId: "test_123",
       protocolName: "test",
+      acronym: "THAPCA",
     };
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -70,7 +71,7 @@ describe("uploadProtocol", () => {
     const file = new File(["pdf content"], "test.pdf", {
       type: "application/pdf",
     });
-    const result = await uploadProtocol(file);
+    const result = await uploadProtocol(file, "THAPCA");
 
     expect(result).toEqual(mockResponse);
     expect(global.fetch).toHaveBeenCalledWith(
@@ -80,6 +81,11 @@ describe("uploadProtocol", () => {
         body: expect.any(FormData),
       })
     );
+
+    const sentFormData = (global.fetch as jest.Mock).mock.calls[0][1]
+      .body as FormData;
+    expect(sentFormData.get("file")).toBeTruthy();
+    expect(sentFormData.get("acronym")).toBe("THAPCA");
   });
 
   it("throws ApiError with code and detail on API error", async () => {
@@ -97,9 +103,9 @@ describe("uploadProtocol", () => {
       type: "text/plain",
     });
 
-    await expect(uploadProtocol(file)).rejects.toThrow(ApiError);
+    await expect(uploadProtocol(file, "TESTT")).rejects.toThrow(ApiError);
     try {
-      await uploadProtocol(file);
+      await uploadProtocol(file, "TESTT");
     } catch (err) {
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).code).toBe("VALIDATION_ERROR");
@@ -120,7 +126,9 @@ describe("uploadProtocol", () => {
       type: "application/pdf",
     });
 
-    await expect(uploadProtocol(file)).rejects.toThrow("Upload failed: 500");
+    await expect(uploadProtocol(file, "TESTT")).rejects.toThrow(
+      "Upload failed: 500"
+    );
   });
 
   it("throws on network error", async () => {
@@ -132,6 +140,8 @@ describe("uploadProtocol", () => {
       type: "application/pdf",
     });
 
-    await expect(uploadProtocol(file)).rejects.toThrow("Failed to fetch");
+    await expect(uploadProtocol(file, "TESTT")).rejects.toThrow(
+      "Failed to fetch"
+    );
   });
 });

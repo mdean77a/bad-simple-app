@@ -19,7 +19,7 @@ describe("ProtocolUpload", () => {
     jest.resetAllMocks();
   });
 
-  it("renders idle state with drop zone and browse button", () => {
+  it("renders idle state with drop zone, browse button, and acronym input", () => {
     render(<ProtocolUpload />);
 
     expect(
@@ -32,6 +32,19 @@ describe("ProtocolUpload", () => {
       screen.getByRole("button", { name: /browse files/i })
     ).toBeInTheDocument();
     expect(screen.getByText("PDF files only")).toBeInTheDocument();
+    expect(screen.getByLabelText("Protocol Acronym")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("e.g., THAPCA, FLUID, PRECISE")
+    ).toBeInTheDocument();
+  });
+
+  it("renders upload button disabled when no file selected", () => {
+    render(<ProtocolUpload />);
+
+    const uploadBtn = screen.getByRole("button", {
+      name: /upload protocol/i,
+    });
+    expect(uploadBtn).toBeDisabled();
   });
 
   it("shows dragging state on dragOver", () => {
@@ -53,9 +66,7 @@ describe("ProtocolUpload", () => {
     expect(dropZone).toHaveClass("border-slate-300");
   });
 
-  it("shows uploading state when file is dropped", async () => {
-    mockUploadProtocol.mockReturnValue(new Promise(() => {})); // never resolves
-
+  it("shows selected file name after dropping a file", () => {
     render(<ProtocolUpload />);
 
     const dropZone = screen.getByLabelText("Upload protocol PDF");
@@ -66,6 +77,52 @@ describe("ProtocolUpload", () => {
     fireEvent.drop(dropZone, {
       dataTransfer: { files: [file] },
     });
+
+    expect(screen.getByText("protocol.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Change file")).toBeInTheDocument();
+  });
+
+  it("enables upload button after file is selected", () => {
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    const uploadBtn = screen.getByRole("button", {
+      name: /upload protocol/i,
+    });
+    expect(uploadBtn).toBeEnabled();
+  });
+
+  it("shows uploading state when upload is triggered", async () => {
+    mockUploadProtocol.mockReturnValue(new Promise(() => {})); // never resolves
+
+    render(<ProtocolUpload />);
+
+    // Select file
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    // Enter acronym
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "THAPCA");
+
+    // Click upload
+    const uploadBtn = screen.getByRole("button", {
+      name: /upload protocol/i,
+    });
+    fireEvent.click(uploadBtn);
 
     expect(
       await screen.findByText("Processing protocol...")
@@ -76,18 +133,26 @@ describe("ProtocolUpload", () => {
     mockUploadProtocol.mockResolvedValue({
       protocolId: "test_123",
       protocolName: "My Protocol",
+      acronym: "THAPCA",
     });
 
     render(<ProtocolUpload />);
 
+    // Select file
     const dropZone = screen.getByLabelText("Upload protocol PDF");
     const file = new File(["pdf"], "protocol.pdf", {
       type: "application/pdf",
     });
-
     fireEvent.drop(dropZone, {
       dataTransfer: { files: [file] },
     });
+
+    // Enter acronym and upload
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "THAPCA");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
 
     expect(await screen.findByText("My Protocol")).toBeInTheDocument();
     expect(
@@ -96,6 +161,34 @@ describe("ProtocolUpload", () => {
 
     const continueBtn = screen.getByRole("button", { name: /continue/i });
     expect(continueBtn).toBeDisabled();
+  });
+
+  it("passes file and acronym to uploadProtocol", async () => {
+    mockUploadProtocol.mockResolvedValue({
+      protocolId: "test_123",
+      protocolName: "My Protocol",
+      acronym: "THAPCA",
+    });
+
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "THAPCA");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
+    await waitFor(() => {
+      expect(mockUploadProtocol).toHaveBeenCalledWith(file, "THAPCA");
+    });
   });
 
   it("shows error state with message on API error", async () => {
@@ -107,10 +200,15 @@ describe("ProtocolUpload", () => {
 
     const dropZone = screen.getByLabelText("Upload protocol PDF");
     const file = new File(["txt"], "test.txt", { type: "text/plain" });
-
     fireEvent.drop(dropZone, {
       dataTransfer: { files: [file] },
     });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "TESTT");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
 
     expect(
       await screen.findByText("File must have a .pdf extension")
@@ -129,10 +227,15 @@ describe("ProtocolUpload", () => {
     const file = new File(["pdf"], "test.pdf", {
       type: "application/pdf",
     });
-
     fireEvent.drop(dropZone, {
       dataTransfer: { files: [file] },
     });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "TESTT");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
 
     expect(
       await screen.findByText(
@@ -152,10 +255,15 @@ describe("ProtocolUpload", () => {
     const file = new File(["pdf"], "test.pdf", {
       type: "application/pdf",
     });
-
     fireEvent.drop(dropZone, {
       dataTransfer: { files: [file] },
     });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "TESTT");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
 
     const tryAgainBtn = await screen.findByRole("button", {
       name: /try again/i,
@@ -174,6 +282,7 @@ describe("ProtocolUpload", () => {
     mockUploadProtocol.mockResolvedValue({
       protocolId: "test_456",
       protocolName: "Selected Protocol",
+      acronym: "FLUID",
     });
 
     render(<ProtocolUpload />);
@@ -184,6 +293,16 @@ describe("ProtocolUpload", () => {
     });
 
     await userEvent.upload(fileInput, file);
+
+    // File should be staged, not uploaded yet
+    expect(screen.getByText("selected.pdf")).toBeInTheDocument();
+
+    // Enter acronym and upload
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "FLUID");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
 
     expect(
       await screen.findByText("Selected Protocol")
@@ -201,12 +320,131 @@ describe("ProtocolUpload", () => {
     const file = new File(["pdf"], "test.pdf", {
       type: "application/pdf",
     });
-
     fireEvent.drop(dropZone, {
       dataTransfer: { files: [file] },
     });
 
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "TESTT");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
     const errorMsg = await screen.findByText("Bad file");
     expect(errorMsg).toHaveAttribute("aria-live", "assertive");
+  });
+
+  // --- Acronym validation ---
+
+  it("shows validation error when acronym is empty on upload", async () => {
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "test.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    // Click upload without entering acronym
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
+    expect(
+      screen.getByText("Protocol acronym is required")
+    ).toBeInTheDocument();
+    expect(mockUploadProtocol).not.toHaveBeenCalled();
+  });
+
+  it("shows validation error when acronym is too short", async () => {
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "test.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "AB");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
+    expect(
+      screen.getByText("Acronym must be at least 5 characters")
+    ).toBeInTheDocument();
+    expect(mockUploadProtocol).not.toHaveBeenCalled();
+  });
+
+  it("clears acronym error when user starts typing", async () => {
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "test.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    // Trigger validation error
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+    expect(
+      screen.getByText("Protocol acronym is required")
+    ).toBeInTheDocument();
+
+    // Start typing to clear error
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "T");
+
+    expect(
+      screen.queryByText("Protocol acronym is required")
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows 5-15 characters hint text", () => {
+    render(<ProtocolUpload />);
+
+    expect(screen.getByText("5-15 characters")).toBeInTheDocument();
+  });
+
+  it("triggers file input when Browse Files is clicked", () => {
+    render(<ProtocolUpload />);
+
+    const fileInput = screen.getByTestId("file-input") as HTMLInputElement;
+    const clickSpy = jest.spyOn(fileInput, "click");
+
+    fireEvent.click(screen.getByRole("button", { name: /browse files/i }));
+
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
+  });
+
+  it("resets selected file when Change file is clicked", () => {
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(screen.getByText("protocol.pdf")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Change file"));
+
+    expect(screen.queryByText("protocol.pdf")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/drag and drop your protocol pdf/i)
+    ).toBeInTheDocument();
   });
 });
