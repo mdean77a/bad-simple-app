@@ -251,3 +251,76 @@ async def test_upload_passes_acronym_to_index(mock_index, client):
     assert response.status_code == 200
     call_args = mock_index.call_args
     assert call_args[0][3] == "THAPCA"  # 4th positional arg is acronym
+
+
+# --- GET /api/v1/protocols ---
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.protocols.list_protocols")
+async def test_get_protocols_returns_list(mock_list, client):
+    mock_list.return_value = [
+        {
+            "protocolId": "protocol_diabetes_20260203",
+            "protocolName": "Diabetes Study",
+            "indexedAt": "2026-02-03T14:30:00+00:00",
+        },
+        {
+            "protocolId": "protocol_cardiac_20260201",
+            "protocolName": "Cardiac Trial",
+            "indexedAt": "2026-02-01T10:00:00+00:00",
+        },
+    ]
+
+    response = await client.get("/api/v1/protocols/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["protocolId"] == "protocol_diabetes_20260203"
+    assert data[0]["protocolName"] == "Diabetes Study"
+    assert data[0]["indexedAt"] == "2026-02-03T14:30:00+00:00"
+    assert data[1]["protocolId"] == "protocol_cardiac_20260201"
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.protocols.list_protocols")
+async def test_get_protocols_empty(mock_list, client):
+    mock_list.return_value = []
+
+    response = await client.get("/api/v1/protocols/")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.protocols.list_protocols")
+async def test_get_protocols_vector_db_error(mock_list, client):
+    mock_list.side_effect = VectorStoreError("Connection refused")
+
+    response = await client.get("/api/v1/protocols/")
+
+    assert response.status_code == 502
+    data = response.json()
+    assert data["code"] == "VECTOR_DB_ERROR"
+    assert "Connection refused" in data["detail"]
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.protocols.list_protocols")
+async def test_get_protocols_response_structure(mock_list, client):
+    """Verify each item has exactly the expected fields."""
+    mock_list.return_value = [
+        {
+            "protocolId": "test_collection",
+            "protocolName": "Test Protocol",
+            "indexedAt": "2026-02-15T00:00:00+00:00",
+        },
+    ]
+
+    response = await client.get("/api/v1/protocols/")
+
+    assert response.status_code == 200
+    item = response.json()[0]
+    assert set(item.keys()) == {"protocolId", "protocolName", "indexedAt"}
