@@ -24,11 +24,16 @@ export async function checkHealth(): Promise<{ status: string }> {
 export interface UploadResult {
   protocolId: string;
   protocolName: string;
+  acronym: string;
 }
 
-export async function uploadProtocol(file: File): Promise<UploadResult> {
+export async function uploadProtocol(
+  file: File,
+  acronym: string
+): Promise<UploadResult> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("acronym", acronym);
 
   const response = await fetch(`${API_BASE_URL}/api/v1/protocols/upload`, {
     method: "POST",

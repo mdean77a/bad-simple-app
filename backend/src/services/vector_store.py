@@ -33,7 +33,9 @@ def chunk_text(text: str) -> list[str]:
     return splitter.split_text(text)
 
 
-def index_protocol(text: str, collection_name: str, protocol_name: str) -> None:
+def index_protocol(
+    text: str, collection_name: str, protocol_name: str, acronym: str
+) -> None:
     """Chunk text, embed via OpenAI, and store in Qdrant."""
     if not text.strip():
         raise VectorStoreError("Cannot index empty text")
@@ -45,8 +47,14 @@ def index_protocol(text: str, collection_name: str, protocol_name: str) -> None:
 
     try:
         chunks = chunk_text(text)
+        indexed_at = datetime.now(timezone.utc).isoformat()
         metadatas = [
-            {"chunk_index": i, "protocol_name": protocol_name}
+            {
+                "chunk_index": i,
+                "protocol_name": protocol_name,
+                "acronym": acronym,
+                "indexed_at": indexed_at,
+            }
             for i in range(len(chunks))
         ]
 

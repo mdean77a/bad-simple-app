@@ -8,7 +8,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     cors_origins: list[str] = ["http://localhost:3000"]
-    cors_origin_regex: str | None = r"https://bad-simple.*\.vercel\.app"
+    cors_origin_regex: str | None = (
+        r"https://bad-simple.*\.vercel\.app"
+        r"|http://(192\.168|10)\.\d+\.\d+(:\d+)?"
+    )
 
     qdrant_url: str = ""
     qdrant_api_key: str | None = None
