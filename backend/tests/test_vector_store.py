@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -7,6 +7,7 @@ from src.services.vector_store import (
     chunk_text,
     generate_collection_name,
     index_protocol,
+    list_protocols,
 )
 
 
@@ -138,3 +139,153 @@ def test_index_protocol_stores_acronym_in_all_chunks(mock_settings, mock_qdrant_
         indexed_at_values.add(metadata["indexed_at"])
     # All chunks share the same indexed_at timestamp
     assert len(indexed_at_values) == 1
+
+
+# --- list_protocols ---
+
+
+def _make_collection(name: str):
+    """Create a mock collection object."""
+    col = MagicMock()
+    col.name = name
+    return col
+
+
+def _make_point(payload: dict):
+    """Create a mock point with payload."""
+    point = MagicMock()
+    point.payload = payload
+    return point
+
+
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_list_protocols_returns_protocol_list(mock_settings, mock_client_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+
+    collections_response = MagicMock()
+    collections_response.collections = [
+        _make_collection("protocol_diabetes_20260203"),
+        _make_collection("protocol_cardiac_20260201"),
+    ]
+    mock_client.get_collections.return_value = collections_response
+
+    mock_client.scroll.side_effect = [
+        (
+            [_make_point({"protocol_name": "Diabetes Study", "indexed_at": "2026-02-03T14:30:00+00:00"})],
+            None,
+        ),
+        (
+            [_make_point({"protocol_name": "Cardiac Trial", "indexed_at": "2026-02-01T10:00:00+00:00"})],
+            None,
+        ),
+    ]
+
+    result = list_protocols()
+
+    assert len(result) == 2
+    assert result[0]["protocolId"] == "protocol_diabetes_20260203"
+    assert result[0]["protocolName"] == "Diabetes Study"
+    assert result[0]["indexedAt"] == "2026-02-03T14:30:00+00:00"
+    assert result[1]["protocolId"] == "protocol_cardiac_20260201"
+    assert result[1]["protocolName"] == "Cardiac Trial"
+
+
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_list_protocols_empty_when_no_collections(mock_settings, mock_client_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+
+    collections_response = MagicMock()
+    collections_response.collections = []
+    mock_client.get_collections.return_value = collections_response
+
+    result = list_protocols()
+
+    assert result == []
+
+
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_list_protocols_sorted_by_indexed_at_descending(mock_settings, mock_client_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+
+    collections_response = MagicMock()
+    collections_response.collections = [
+        _make_collection("older"),
+        _make_collection("newer"),
+        _make_collection("middle"),
+    ]
+    mock_client.get_collections.return_value = collections_response
+
+    mock_client.scroll.side_effect = [
+        ([_make_point({"protocol_name": "Older", "indexed_at": "2026-01-01T00:00:00+00:00"})], None),
+        ([_make_point({"protocol_name": "Newer", "indexed_at": "2026-03-01T00:00:00+00:00"})], None),
+        ([_make_point({"protocol_name": "Middle", "indexed_at": "2026-02-01T00:00:00+00:00"})], None),
+    ]
+
+    result = list_protocols()
+
+    assert [p["protocolName"] for p in result] == ["Newer", "Middle", "Older"]
+
+
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_list_protocols_raises_on_qdrant_failure(mock_settings, mock_client_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.get_collections.side_effect = ConnectionError("Connection refused")
+
+    with pytest.raises(VectorStoreError, match="Failed to list protocols"):
+        list_protocols()
+
+
+@patch("src.services.vector_store.settings")
+def test_list_protocols_missing_qdrant_url(mock_settings):
+    mock_settings.qdrant_url = ""
+
+    with pytest.raises(VectorStoreError, match="QDRANT_URL is not configured"):
+        list_protocols()
+
+
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_list_protocols_skips_empty_collections(mock_settings, mock_client_cls):
+    """Collections with no points are skipped."""
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+
+    collections_response = MagicMock()
+    collections_response.collections = [
+        _make_collection("has_points"),
+        _make_collection("empty_collection"),
+    ]
+    mock_client.get_collections.return_value = collections_response
+
+    mock_client.scroll.side_effect = [
+        ([_make_point({"protocol_name": "Has Points", "indexed_at": "2026-02-01T00:00:00+00:00"})], None),
+        ([], None),  # empty collection
+    ]
+
+    result = list_protocols()
+
+    assert len(result) == 1
+    assert result[0]["protocolName"] == "Has Points"

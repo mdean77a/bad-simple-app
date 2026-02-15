@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from qdrant_client import QdrantClient
 
 from src.config import settings
 
@@ -71,3 +72,39 @@ def index_protocol(
         )
     except Exception as exc:
         raise VectorStoreError(f"Vector indexing failed: {exc}") from exc
+
+
+def list_protocols() -> list[dict]:
+    """List all indexed protocols from Qdrant.
+
+    Returns list of {protocolId, protocolName, indexedAt} sorted by indexedAt desc.
+    """
+    if not settings.qdrant_url:
+        raise VectorStoreError("QDRANT_URL is not configured")
+
+    try:
+        client = QdrantClient(
+            url=settings.qdrant_url, api_key=settings.qdrant_api_key
+        )
+        collections = client.get_collections().collections
+
+        protocols = []
+        for collection in collections:
+            points, _ = client.scroll(collection.name, limit=1)
+            if not points:
+                continue
+            metadata = points[0].payload or {}
+            protocols.append(
+                {
+                    "protocolId": collection.name,
+                    "protocolName": metadata.get("protocol_name", collection.name),
+                    "indexedAt": metadata.get("indexed_at", ""),
+                }
+            )
+
+        protocols.sort(key=lambda p: p["indexedAt"], reverse=True)
+        return protocols
+    except VectorStoreError:
+        raise
+    except Exception as exc:
+        raise VectorStoreError(f"Failed to list protocols: {exc}") from exc

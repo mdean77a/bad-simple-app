@@ -8,9 +8,20 @@ from src.services.vector_store import (
     VectorStoreError,
     generate_collection_name,
     index_protocol,
+    list_protocols,
 )
 
 router = APIRouter()
+
+
+@router.get("/")
+async def get_protocols() -> list[dict]:
+    """List all indexed protocols."""
+    try:
+        protocols = await asyncio.to_thread(list_protocols)
+    except VectorStoreError as exc:
+        return _vector_db_error(str(exc))
+    return protocols
 
 
 @router.post("/upload")
