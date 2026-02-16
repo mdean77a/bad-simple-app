@@ -49,12 +49,12 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Protocol Ingestion Pipeline
-  epic-2: in-progress
+  epic-2: done
   2-1-implement-pdf-upload-and-text-extraction: done
   2-2-implement-protocol-chunking-and-vector-indexing: done
   2-3-create-protocol-list-endpoint: done
   2-4-build-protocol-upload-ui: done
-  2-5-build-protocol-selection-ui: backlog
+  2-5-build-protocol-selection-ui: done
   2-6-add-protocol-acronym: done
   epic-2-retrospective: optional
 
