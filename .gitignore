@@ -32,6 +32,9 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Protocol PDFs (test documents)
+protocols/
+
 # OS files
 .DS_Store
 Thumbs.db

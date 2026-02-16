@@ -74,6 +74,36 @@ def index_protocol(
         raise VectorStoreError(f"Vector indexing failed: {exc}") from exc
 
 
+def search_protocol(collection_name: str, query: str, k: int = 20) -> list[str]:
+    """Retrieve relevant chunks from a protocol collection via similarity search.
+
+    Returns list of chunk text strings ranked by relevance.
+    """
+    if not settings.qdrant_url:
+        raise VectorStoreError("QDRANT_URL is not configured")
+    if not settings.openai_api_key:
+        raise VectorStoreError("OPENAI_API_KEY is not configured")
+
+    try:
+        client = QdrantClient(
+            url=settings.qdrant_url, api_key=settings.qdrant_api_key
+        )
+        store = QdrantVectorStore(
+            client=client,
+            collection_name=collection_name,
+            embedding=OpenAIEmbeddings(
+                model="text-embedding-3-small",
+                api_key=settings.openai_api_key,
+            ),
+        )
+        docs = store.similarity_search(query, k=k)
+        return [doc.page_content for doc in docs]
+    except VectorStoreError:
+        raise
+    except Exception as exc:
+        raise VectorStoreError(f"Protocol search failed: {exc}") from exc
+
+
 def list_protocols() -> list[dict]:
     """List all indexed protocols from Qdrant.
 

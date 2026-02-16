@@ -158,7 +158,7 @@ async def test_upload_acronym_too_short(client):
     assert response.status_code == 422
     data = response.json()
     assert data["code"] == "VALIDATION_ERROR"
-    assert "5 and 15" in data["detail"]
+    assert "3 and 20" in data["detail"]
 
 
 @pytest.mark.asyncio
@@ -167,13 +167,13 @@ async def test_upload_acronym_too_long(client):
     response = await client.post(
         "/api/v1/protocols/upload",
         files={"file": ("test.pdf", pdf_bytes, "application/pdf")},
-        data={"acronym": "A" * 16},
+        data={"acronym": "A" * 21},
     )
 
     assert response.status_code == 422
     data = response.json()
     assert data["code"] == "VALIDATION_ERROR"
-    assert "5 and 15" in data["detail"]
+    assert "3 and 20" in data["detail"]
 
 
 @pytest.mark.asyncio
@@ -209,24 +209,24 @@ async def test_upload_acronym_trimmed(mock_index, client):
 @pytest.mark.asyncio
 @patch("src.api.routes.protocols.index_protocol")
 async def test_upload_acronym_exact_min_length(mock_index, client):
-    """Acronym of exactly 5 characters is accepted."""
+    """Acronym of exactly 3 characters is accepted."""
     pdf_bytes = _make_pdf(["Content"])
     response = await client.post(
         "/api/v1/protocols/upload",
         files={"file": ("test.pdf", pdf_bytes, "application/pdf")},
-        data={"acronym": "ABCDE"},
+        data={"acronym": "ABC"},
     )
 
     assert response.status_code == 200
-    assert response.json()["acronym"] == "ABCDE"
+    assert response.json()["acronym"] == "ABC"
 
 
 @pytest.mark.asyncio
 @patch("src.api.routes.protocols.index_protocol")
 async def test_upload_acronym_exact_max_length(mock_index, client):
-    """Acronym of exactly 15 characters is accepted."""
+    """Acronym of exactly 20 characters is accepted."""
     pdf_bytes = _make_pdf(["Content"])
-    acronym = "A" * 15
+    acronym = "A" * 20
     response = await client.post(
         "/api/v1/protocols/upload",
         files={"file": ("test.pdf", pdf_bytes, "application/pdf")},
