@@ -28,8 +28,8 @@ async def get_protocols() -> list[dict]:
 async def upload_protocol(file: UploadFile, acronym: str = Form(...)) -> dict:
     """Upload a clinical protocol PDF, extract text, and index in vector store."""
     acronym = acronym.strip()
-    if len(acronym) < 5 or len(acronym) > 15:
-        return _validation_error("Acronym must be between 5 and 15 characters")
+    if len(acronym) < 3 or len(acronym) > 20:
+        return _validation_error("Acronym must be between 3 and 20 characters")
 
     filename = file.filename or "unknown.pdf"
 

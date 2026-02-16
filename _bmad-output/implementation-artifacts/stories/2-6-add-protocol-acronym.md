@@ -12,9 +12,9 @@ so that **protocols are easily identifiable by their commonly known abbreviation
 
 1. **Given** I am on the upload page, **When** I view the upload form, **Then** I see a required text input for "Protocol Acronym" alongside the file upload.
 
-2. **Given** I am entering an acronym, **When** I type fewer than 5 or more than 15 characters, **Then** I see a validation error and cannot submit.
+2. **Given** I am entering an acronym, **When** I type fewer than 3 or more than 20 characters, **Then** I see a validation error and cannot submit.
 
-3. **Given** I select a PDF and enter a valid acronym (5-15 characters), **When** I click upload, **Then** the acronym is sent to the backend along with the file.
+3. **Given** I select a PDF and enter a valid acronym (3-20 characters), **When** I click upload, **Then** the acronym is sent to the backend along with the file.
 
 4. **Given** the backend receives a file and acronym, **When** the upload is processed, **Then** the acronym is stored as metadata in Qdrant chunks **And** the upload response includes the acronym.
 
@@ -26,7 +26,7 @@ so that **protocols are easily identifiable by their commonly known abbreviation
 
 - [ ] Task 1: Update backend upload endpoint to accept `acronym` form field (AC: #3, #4, #5)
   - [ ] 1.1: Add `acronym: str` parameter to POST `/upload` handler in `protocols.py`
-  - [ ] 1.2: Validate acronym length (5-15 characters), return 422 VALIDATION_ERROR if invalid
+  - [ ] 1.2: Validate acronym length (3-20 characters), return 422 VALIDATION_ERROR if invalid
   - [ ] 1.3: Pass acronym through to `index_protocol()`
   - [ ] 1.4: Include `acronym` in the upload response alongside `protocolId` and `protocolName`
 - [ ] Task 2: Update vector store to store acronym in metadata (AC: #4)
@@ -37,7 +37,7 @@ so that **protocols are easily identifiable by their commonly known abbreviation
   - [ ] 3.2: Include `acronym` in each protocol's response object
 - [ ] Task 4: Update frontend upload UI to collect acronym (AC: #1, #2, #5)
   - [ ] 4.1: Add text input for "Protocol Acronym" to ProtocolUpload component
-  - [ ] 4.2: Add client-side validation: required, 5-15 characters
+  - [ ] 4.2: Add client-side validation: required, 3-20 characters
   - [ ] 4.3: Send acronym as form field in upload request
   - [ ] 4.4: Update API client `uploadProtocol()` to accept and send acronym
 - [ ] Task 5: Update backend tests (AC: #3, #4, #5)
@@ -60,7 +60,7 @@ This story modifies code from completed stories (2.2, 2.4) and adds to story 2.3
 **`backend/src/api/routes/protocols.py`** — existing upload endpoint:
 - Currently accepts only `file: UploadFile`
 - Add `acronym: str = Form(...)` parameter
-- Validate: `5 <= len(acronym.strip()) <= 15`, return 422 if invalid
+- Validate: `3 <= len(acronym.strip()) <= 20`, return 422 if invalid
 - Pass to `index_protocol(text, collection_name, protocol_name, acronym)`
 - Response becomes: `{"protocolId": str, "protocolName": str, "acronym": str}`
 - Use existing `_validation_error()` helper for acronym validation errors
@@ -78,7 +78,7 @@ This story modifies code from completed stories (2.2, 2.4) and adds to story 2.3
 **`frontend/src/components/projects/ProtocolUpload.tsx`**:
 - Add a text input above or below the file drop zone
 - Label: "Protocol Acronym" with helper text (e.g., "e.g., THAPCA, FLUID, PRECISE")
-- Validation: required, 5-15 characters
+- Validation: required, 3-20 characters
 - Disable upload button until both file selected AND valid acronym entered
 - Send as `FormData.append("acronym", acronym)` alongside the file
 

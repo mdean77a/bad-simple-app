@@ -13,6 +13,10 @@ class Settings(BaseSettings):
         r"|http://(192\.168|10)\.\d+\.\d+(:\d+)?"
     )
 
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-sonnet-4-20250514"
+    anthropic_api_key: str | None = None
+
     qdrant_url: str = ""
     qdrant_api_key: str | None = None
     openai_api_key: str | None = None

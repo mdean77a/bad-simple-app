@@ -8,6 +8,7 @@ from src.services.vector_store import (
     generate_collection_name,
     index_protocol,
     list_protocols,
+    search_protocol,
 )
 
 
@@ -139,6 +140,101 @@ def test_index_protocol_stores_acronym_in_all_chunks(mock_settings, mock_qdrant_
         indexed_at_values.add(metadata["indexed_at"])
     # All chunks share the same indexed_at timestamp
     assert len(indexed_at_values) == 1
+
+
+# --- search_protocol ---
+
+
+@patch("src.services.vector_store.QdrantVectorStore")
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_search_protocol_returns_chunk_texts(mock_settings, mock_client_cls, mock_vs_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+    mock_settings.openai_api_key = "openai-key"
+
+    mock_doc1 = MagicMock()
+    mock_doc1.page_content = "Chunk about study purpose"
+    mock_doc2 = MagicMock()
+    mock_doc2.page_content = "Chunk about procedures"
+
+    mock_store = MagicMock()
+    mock_vs_cls.return_value = mock_store
+    mock_store.similarity_search.return_value = [mock_doc1, mock_doc2]
+
+    result = search_protocol("protocol_test_123", "study purpose", k=5)
+
+    assert result == ["Chunk about study purpose", "Chunk about procedures"]
+    mock_store.similarity_search.assert_called_once_with("study purpose", k=5)
+
+
+@patch("src.services.vector_store.settings")
+def test_search_protocol_missing_qdrant_url(mock_settings):
+    mock_settings.qdrant_url = ""
+    mock_settings.openai_api_key = "openai-key"
+
+    with pytest.raises(VectorStoreError, match="QDRANT_URL is not configured"):
+        search_protocol("protocol_test_123", "query")
+
+
+@patch("src.services.vector_store.settings")
+def test_search_protocol_missing_openai_key(mock_settings):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.openai_api_key = None
+
+    with pytest.raises(VectorStoreError, match="OPENAI_API_KEY is not configured"):
+        search_protocol("protocol_test_123", "query")
+
+
+@patch("src.services.vector_store.QdrantVectorStore")
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_search_protocol_wraps_errors(mock_settings, mock_client_cls, mock_vs_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+    mock_settings.openai_api_key = "openai-key"
+
+    mock_store = MagicMock()
+    mock_vs_cls.return_value = mock_store
+    mock_store.similarity_search.side_effect = ConnectionError("timeout")
+
+    with pytest.raises(VectorStoreError, match="Protocol search failed"):
+        search_protocol("protocol_test_123", "query")
+
+
+@patch("src.services.vector_store.QdrantVectorStore")
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_search_protocol_empty_results(mock_settings, mock_client_cls, mock_vs_cls):
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+    mock_settings.openai_api_key = "openai-key"
+
+    mock_store = MagicMock()
+    mock_vs_cls.return_value = mock_store
+    mock_store.similarity_search.return_value = []
+
+    result = search_protocol("protocol_test_123", "query")
+
+    assert result == []
+
+
+@patch("src.services.vector_store.QdrantVectorStore")
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_search_protocol_default_k(mock_settings, mock_client_cls, mock_vs_cls):
+    """Default k value is 20."""
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+    mock_settings.openai_api_key = "openai-key"
+
+    mock_store = MagicMock()
+    mock_vs_cls.return_value = mock_store
+    mock_store.similarity_search.return_value = []
+
+    search_protocol("protocol_test_123", "query")
+
+    mock_store.similarity_search.assert_called_once_with("query", k=20)
 
 
 # --- list_protocols ---

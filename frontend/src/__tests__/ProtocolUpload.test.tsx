@@ -373,7 +373,7 @@ describe("ProtocolUpload", () => {
     );
 
     expect(
-      screen.getByText("Acronym must be at least 5 characters")
+      screen.getByText("Acronym must be at least 3 characters")
     ).toBeInTheDocument();
     expect(mockUploadProtocol).not.toHaveBeenCalled();
   });
@@ -406,10 +406,10 @@ describe("ProtocolUpload", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows 5-15 characters hint text", () => {
+  it("shows 3-20 characters hint text", () => {
     render(<ProtocolUpload />);
 
-    expect(screen.getByText("5-15 characters")).toBeInTheDocument();
+    expect(screen.getByText("3-20 characters")).toBeInTheDocument();
   });
 
   it("triggers file input when Browse Files is clicked", () => {

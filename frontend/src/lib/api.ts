@@ -34,7 +34,9 @@ export interface Protocol {
 }
 
 export async function fetchProtocols(): Promise<Protocol[]> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/protocols/`);
+  const response = await fetch(`${API_BASE_URL}/api/v1/protocols/`, {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch protocols: ${response.status}`);
   }

@@ -26,8 +26,8 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
   const validateAcronym = useCallback((value: string): string | null => {
     const trimmed = value.trim();
     if (!trimmed) return "Protocol acronym is required";
-    if (trimmed.length < 5) return "Acronym must be at least 5 characters";
-    if (trimmed.length > 15) return "Acronym must be at most 15 characters";
+    if (trimmed.length < 3) return "Acronym must be at least 3 characters";
+    if (trimmed.length > 20) return "Acronym must be at most 20 characters";
     return null;
   }, []);
 
@@ -280,14 +280,14 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
               ? "border-red-300 focus:ring-red-500"
               : "border-slate-300"
           }`}
-          maxLength={15}
+          maxLength={20}
         />
         {acronymError && (
           <p className="mt-1 text-sm text-red-600" aria-live="polite">
             {acronymError}
           </p>
         )}
-        <p className="mt-1 text-xs text-slate-400">5-15 characters</p>
+        <p className="mt-1 text-xs text-slate-400">3-20 characters</p>
       </div>
 
       <button
