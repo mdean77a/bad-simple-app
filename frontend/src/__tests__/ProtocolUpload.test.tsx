@@ -158,9 +158,6 @@ describe("ProtocolUpload", () => {
     expect(
       screen.getByText("Protocol uploaded successfully")
     ).toBeInTheDocument();
-
-    const continueBtn = screen.getByRole("button", { name: /continue/i });
-    expect(continueBtn).toBeDisabled();
   });
 
   it("passes file and acronym to uploadProtocol", async () => {
@@ -495,5 +492,35 @@ describe("ProtocolUpload", () => {
     fireEvent.click(screen.getByText("Change file"));
 
     expect(onFileChange).toHaveBeenLastCalledWith(false);
+  });
+
+  // --- onUploadSuccess callback ---
+
+  it("calls onUploadSuccess with protocolId after successful upload", async () => {
+    mockUploadProtocol.mockResolvedValue({
+      protocolId: "protocol_test_123",
+      protocolName: "My Protocol",
+      acronym: "THAPCA",
+    });
+    const onUploadSuccess = jest.fn();
+
+    render(<ProtocolUpload onUploadSuccess={onUploadSuccess} />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "THAPCA");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
+    await screen.findByText("Protocol uploaded successfully");
+    expect(onUploadSuccess).toHaveBeenCalledWith("protocol_test_123");
   });
 });

@@ -122,6 +122,20 @@ describe("New Project Page", () => {
     });
   });
 
+  it("renders Continue button disabled initially", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      const continueBtn = screen.getByRole("button", { name: /continue/i });
+      expect(continueBtn).toBeDisabled();
+    });
+  });
+
   it("navigates to / when back button is clicked", async () => {
     localStorage.setItem(
       "user",

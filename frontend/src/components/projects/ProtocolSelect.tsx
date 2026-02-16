@@ -94,16 +94,6 @@ export function ProtocolSelect({
           </option>
         ))}
       </select>
-      <button
-        disabled={!selectedId}
-        className={`w-full rounded-lg px-6 py-2.5 font-medium text-white ${
-          selectedId
-            ? "bg-violet-600 hover:bg-violet-700"
-            : "bg-violet-300 cursor-not-allowed"
-        }`}
-      >
-        Continue
-      </button>
     </div>
   );
 }

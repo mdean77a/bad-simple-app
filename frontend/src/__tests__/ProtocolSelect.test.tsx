@@ -107,42 +107,6 @@ describe("ProtocolSelect", () => {
     expect(mockFetchProtocols).toHaveBeenCalledTimes(2);
   });
 
-  it("renders Continue button disabled when nothing selected", async () => {
-    mockFetchProtocols.mockResolvedValue(mockProtocols);
-
-    render(<ProtocolSelect />);
-
-    await screen.findByLabelText("Select a protocol");
-
-    const continueBtn = screen.getByRole("button", { name: /continue/i });
-    expect(continueBtn).toBeDisabled();
-  });
-
-  it("enables Continue button after selecting a protocol", async () => {
-    mockFetchProtocols.mockResolvedValue(mockProtocols);
-
-    render(<ProtocolSelect />);
-
-    const select = await screen.findByLabelText("Select a protocol");
-    await userEvent.selectOptions(select, "protocol_diabetes_20260203");
-
-    const continueBtn = screen.getByRole("button", { name: /continue/i });
-    expect(continueBtn).toBeEnabled();
-  });
-
-  it("disables Continue when placeholder is re-selected", async () => {
-    mockFetchProtocols.mockResolvedValue(mockProtocols);
-
-    render(<ProtocolSelect />);
-
-    const select = await screen.findByLabelText("Select a protocol");
-    await userEvent.selectOptions(select, "protocol_diabetes_20260203");
-    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
-
-    await userEvent.selectOptions(select, "");
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
-  });
-
   it("calls onSelectionChange when selection changes", async () => {
     mockFetchProtocols.mockResolvedValue(mockProtocols);
     const onSelectionChange = jest.fn();

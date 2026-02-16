@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -12,12 +12,22 @@ export default function NewProjectPage() {
   const router = useRouter();
   const [hasFileSelected, setHasFileSelected] = useState(false);
   const [hasProtocolSelected, setHasProtocolSelected] = useState(false);
+  const [protocolReady, setProtocolReady] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace("/");
     }
   }, [isLoading, user, router]);
+
+  const handleUploadSuccess = useCallback(() => {
+    setProtocolReady(true);
+  }, []);
+
+  const handleSelectionChange = useCallback((hasSelection: boolean) => {
+    setHasProtocolSelected(hasSelection);
+    setProtocolReady(hasSelection);
+  }, []);
 
   if (isLoading || !user) {
     return null;
@@ -39,6 +49,7 @@ export default function NewProjectPage() {
             <ProtocolUpload
               disabled={hasProtocolSelected}
               onFileChange={setHasFileSelected}
+              onUploadSuccess={handleUploadSuccess}
             />
           </section>
           <section>
@@ -47,9 +58,19 @@ export default function NewProjectPage() {
             </h2>
             <ProtocolSelect
               disabled={hasFileSelected}
-              onSelectionChange={setHasProtocolSelected}
+              onSelectionChange={handleSelectionChange}
             />
           </section>
+          <button
+            disabled={!protocolReady}
+            className={`w-full rounded-lg px-6 py-2.5 font-medium text-white ${
+              protocolReady
+                ? "bg-violet-600 hover:bg-violet-700"
+                : "bg-violet-300 cursor-not-allowed"
+            }`}
+          >
+            Continue
+          </button>
         </div>
       </div>
     </div>
