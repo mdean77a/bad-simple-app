@@ -10,7 +10,12 @@ type UploadState =
   | { status: "success"; protocolName: string }
   | { status: "error"; message: string };
 
-export function ProtocolUpload() {
+interface ProtocolUploadProps {
+  disabled?: boolean;
+  onFileChange?: (hasFile: boolean) => void;
+}
+
+export function ProtocolUpload({ disabled, onFileChange }: ProtocolUploadProps) {
   const [state, setState] = useState<UploadState>({ status: "idle" });
   const [acronym, setAcronym] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -45,24 +50,32 @@ export function ProtocolUpload() {
     }
   }, [selectedFile, acronym, validateAcronym]);
 
-  const handleFileSelected = useCallback((file: File) => {
-    setSelectedFile(file);
-  }, []);
+  const handleFileSelected = useCallback(
+    (file: File) => {
+      setSelectedFile(file);
+      onFileChange?.(true);
+    },
+    [onFileChange]
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setState({ status: "idle" });
+      if (disabled) return;
       const file = e.dataTransfer.files[0];
       if (file) handleFileSelected(file);
     },
-    [handleFileSelected]
+    [handleFileSelected, disabled]
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setState({ status: "dragging" });
-  }, []);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      if (!disabled) setState({ status: "dragging" });
+    },
+    [disabled]
+  );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -86,8 +99,15 @@ export function ProtocolUpload() {
     setSelectedFile(null);
     setAcronym("");
     setAcronymError(null);
+    onFileChange?.(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [onFileChange]);
+
+  const handleClearFile = useCallback(() => {
+    setSelectedFile(null);
+    onFileChange?.(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [onFileChange]);
 
   if (state.status === "uploading") {
     return (
@@ -165,12 +185,13 @@ export function ProtocolUpload() {
   const isDragging = state.status === "dragging";
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         aria-label="Upload protocol PDF"
+        aria-disabled={disabled}
         className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors ${
           isDragging
             ? "border-violet-500 bg-violet-50"
@@ -197,10 +218,7 @@ export function ProtocolUpload() {
               {selectedFile.name}
             </p>
             <button
-              onClick={() => {
-                setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
+              onClick={handleClearFile}
               className="mt-2 text-sm text-slate-500 hover:text-slate-700 underline"
             >
               Change file
@@ -225,6 +243,7 @@ export function ProtocolUpload() {
             </p>
             <button
               onClick={handleBrowseClick}
+              disabled={disabled}
               className="mt-2 rounded-lg bg-violet-600 px-6 py-2.5 font-medium text-white hover:bg-violet-700"
             >
               Browse Files
@@ -239,6 +258,7 @@ export function ProtocolUpload() {
           onChange={handleFileChange}
           className="hidden"
           data-testid="file-input"
+          disabled={disabled}
         />
       </div>
 
@@ -258,6 +278,7 @@ export function ProtocolUpload() {
             if (acronymError) setAcronymError(null);
           }}
           placeholder="e.g., THAPCA, FLUID, PRECISE"
+          disabled={disabled}
           className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 ${
             acronymError
               ? "border-red-300 focus:ring-red-500"
@@ -275,9 +296,9 @@ export function ProtocolUpload() {
 
       <button
         onClick={handleUpload}
-        disabled={!selectedFile}
+        disabled={!selectedFile || disabled}
         className={`w-full rounded-lg px-6 py-2.5 font-medium text-white ${
-          selectedFile
+          selectedFile && !disabled
             ? "bg-violet-600 hover:bg-violet-700"
             : "bg-violet-300 cursor-not-allowed"
         }`}

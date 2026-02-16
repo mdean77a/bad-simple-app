@@ -27,6 +27,20 @@ export interface UploadResult {
   acronym: string;
 }
 
+export interface Protocol {
+  protocolId: string;
+  protocolName: string;
+  indexedAt: string;
+}
+
+export async function fetchProtocols(): Promise<Protocol[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/protocols/`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch protocols: ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function uploadProtocol(
   file: File,
   acronym: string

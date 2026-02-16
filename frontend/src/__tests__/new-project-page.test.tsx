@@ -12,7 +12,14 @@ jest.mock("next/navigation", () => ({
   }),
 }));
 
-jest.mock("@/lib/api");
+jest.mock("@/lib/api", () => {
+  const actual = jest.requireActual("@/lib/api");
+  return {
+    ...actual,
+    uploadProtocol: jest.fn(),
+    fetchProtocols: jest.fn().mockResolvedValue([]),
+  };
+});
 
 const renderPage = () => {
   return render(
@@ -78,6 +85,39 @@ describe("New Project Page", () => {
     await waitFor(() => {
       expect(
         screen.getByLabelText("Upload protocol PDF")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders Upload New Protocol section heading", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Upload New Protocol" })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders Or Select Existing Protocol section heading", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", {
+          level: 2,
+          name: "Or Select Existing Protocol",
+        })
       ).toBeInTheDocument();
     });
   });

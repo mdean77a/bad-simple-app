@@ -447,4 +447,53 @@ describe("ProtocolUpload", () => {
       screen.getByText(/drag and drop your protocol pdf/i)
     ).toBeInTheDocument();
   });
+
+  // --- disabled prop ---
+
+  it("applies disabled styling when disabled", () => {
+    render(<ProtocolUpload disabled />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    expect(dropZone.closest(".opacity-50")).toBeTruthy();
+  });
+
+  it("disables acronym input when disabled", () => {
+    render(<ProtocolUpload disabled />);
+
+    expect(screen.getByLabelText("Protocol Acronym")).toBeDisabled();
+  });
+
+  // --- onFileChange callback ---
+
+  it("calls onFileChange(true) when file is selected", () => {
+    const onFileChange = jest.fn();
+    render(<ProtocolUpload onFileChange={onFileChange} />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(onFileChange).toHaveBeenCalledWith(true);
+  });
+
+  it("calls onFileChange(false) when file is cleared", () => {
+    const onFileChange = jest.fn();
+    render(<ProtocolUpload onFileChange={onFileChange} />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    fireEvent.click(screen.getByText("Change file"));
+
+    expect(onFileChange).toHaveBeenLastCalledWith(false);
+  });
 });
