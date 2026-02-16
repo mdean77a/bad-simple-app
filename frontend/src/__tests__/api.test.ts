@@ -1,4 +1,4 @@
-import { checkHealth, uploadProtocol, ApiError, API_BASE_URL } from "@/lib/api";
+import { checkHealth, uploadProtocol, fetchProtocols, ApiError, API_BASE_URL } from "@/lib/api";
 
 describe("API_BASE_URL", () => {
   it("defaults to localhost:8000 when env var is not set", () => {
@@ -143,5 +143,51 @@ describe("uploadProtocol", () => {
     await expect(uploadProtocol(file, "TESTT")).rejects.toThrow(
       "Failed to fetch"
     );
+  });
+});
+
+describe("fetchProtocols", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("returns protocol list on success", async () => {
+    const mockProtocols = [
+      {
+        protocolId: "protocol_diabetes_20260203",
+        protocolName: "Diabetes Study",
+        indexedAt: "2026-02-03T14:30:00+00:00",
+      },
+    ];
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockProtocols),
+    });
+
+    const result = await fetchProtocols();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API_BASE_URL}/api/v1/protocols/`
+    );
+    expect(result).toEqual(mockProtocols);
+  });
+
+  it("throws on non-ok response", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+    });
+
+    await expect(fetchProtocols()).rejects.toThrow(
+      "Failed to fetch protocols: 502"
+    );
+  });
+
+  it("throws on network error", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(fetchProtocols()).rejects.toThrow("Failed to fetch");
   });
 });

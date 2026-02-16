@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ProtocolUpload } from "@/components/projects/ProtocolUpload";
+import { ProtocolSelect } from "@/components/projects/ProtocolSelect";
 
 export default function NewProjectPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const [hasFileSelected, setHasFileSelected] = useState(false);
+  const [hasProtocolSelected, setHasProtocolSelected] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -28,8 +31,25 @@ export default function NewProjectPage() {
         onBack={() => router.push("/")}
       />
       <div className="flex flex-1 flex-col items-center px-4 pt-12">
-        <div className="w-full max-w-lg">
-          <ProtocolUpload />
+        <div className="w-full max-w-lg space-y-10">
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">
+              Upload New Protocol
+            </h2>
+            <ProtocolUpload
+              disabled={hasProtocolSelected}
+              onFileChange={setHasFileSelected}
+            />
+          </section>
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">
+              Or Select Existing Protocol
+            </h2>
+            <ProtocolSelect
+              disabled={hasFileSelected}
+              onSelectionChange={setHasProtocolSelected}
+            />
+          </section>
         </div>
       </div>
     </div>
