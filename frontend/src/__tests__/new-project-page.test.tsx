@@ -1,6 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import NewProjectPage from "@/app/projects/new/page";
 import { AuthProvider } from "@/lib/auth";
+import * as api from "@/lib/api";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -20,6 +22,13 @@ jest.mock("@/lib/api", () => {
     fetchProtocols: jest.fn().mockResolvedValue([]),
   };
 });
+
+const mockFetchProtocols = api.fetchProtocols as jest.MockedFunction<
+  typeof api.fetchProtocols
+>;
+const mockUploadProtocol = api.uploadProtocol as jest.MockedFunction<
+  typeof api.uploadProtocol
+>;
 
 const renderPage = () => {
   return render(
@@ -152,5 +161,74 @@ describe("New Project Page", () => {
 
     screen.getByRole("button", { name: /go back/i }).click();
     expect(mockPush).toHaveBeenCalledWith("/");
+  });
+
+  it("navigates to outline page when Continue is clicked after upload success", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+    mockUploadProtocol.mockResolvedValue({
+      protocolId: "protocol_uploaded_123",
+      protocolName: "Uploaded Protocol",
+      acronym: "TEST",
+    });
+
+    renderPage();
+
+    // Drop a file
+    const dropZone = await screen.findByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    // Enter acronym and upload
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "TEST");
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
+    // Wait for upload success
+    await screen.findByText("Protocol uploaded successfully");
+
+    // Click Continue
+    const continueBtn = screen.getByRole("button", { name: /continue/i });
+    expect(continueBtn).toBeEnabled();
+    await userEvent.click(continueBtn);
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/projects/protocol_uploaded_123/outline"
+    );
+  });
+
+  it("navigates to outline page when Continue is clicked after protocol selection", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+    mockFetchProtocols.mockResolvedValue([
+      {
+        protocolId: "protocol_diabetes_20260203",
+        protocolName: "Diabetes Study",
+        indexedAt: "2026-02-03T14:30:00+00:00",
+      },
+    ]);
+
+    renderPage();
+
+    const select = await screen.findByLabelText("Select a protocol");
+    await userEvent.selectOptions(select, "protocol_diabetes_20260203");
+
+    const continueBtn = screen.getByRole("button", { name: /continue/i });
+    expect(continueBtn).toBeEnabled();
+    await userEvent.click(continueBtn);
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/projects/protocol_diabetes_20260203/outline"
+    );
   });
 });

@@ -378,6 +378,32 @@ describe("ProtocolUpload", () => {
     expect(mockUploadProtocol).not.toHaveBeenCalled();
   });
 
+  it("shows validation error when acronym exceeds 20 characters", async () => {
+    render(<ProtocolUpload />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "test.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    // Type directly into the acronym state by setting value programmatically
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    fireEvent.change(acronymInput, {
+      target: { value: "ABCDEFGHIJKLMNOPQRSTU" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /upload protocol/i })
+    );
+
+    expect(
+      screen.getByText("Acronym must be at most 20 characters")
+    ).toBeInTheDocument();
+    expect(mockUploadProtocol).not.toHaveBeenCalled();
+  });
+
   it("clears acronym error when user starts typing", async () => {
     render(<ProtocolUpload />);
 
@@ -452,6 +478,22 @@ describe("ProtocolUpload", () => {
 
     const dropZone = screen.getByLabelText("Upload protocol PDF");
     expect(dropZone.closest(".opacity-50")).toBeTruthy();
+  });
+
+  it("ignores file drop when disabled", () => {
+    const onFileChange = jest.fn();
+    render(<ProtocolUpload disabled onFileChange={onFileChange} />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "protocol.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(onFileChange).not.toHaveBeenCalled();
+    expect(screen.queryByText("protocol.pdf")).not.toBeInTheDocument();
   });
 
   it("disables acronym input when disabled", () => {

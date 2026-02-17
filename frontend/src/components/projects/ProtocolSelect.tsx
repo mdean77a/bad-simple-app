@@ -10,7 +10,7 @@ type LoadState =
 
 interface ProtocolSelectProps {
   disabled?: boolean;
-  onSelectionChange?: (hasSelection: boolean) => void;
+  onSelectionChange?: (protocolId: string | null) => void;
 }
 
 export function ProtocolSelect({
@@ -40,7 +40,7 @@ export function ProtocolSelect({
   const handleChange = useCallback(
     (value: string) => {
       setSelectedId(value);
-      onSelectionChange?.(value !== "");
+      onSelectionChange?.(value || null);
     },
     [onSelectionChange]
   );
@@ -99,7 +99,6 @@ export function ProtocolSelect({
 }
 
 function formatDate(isoString: string): string {
-  if (!isoString) return "";
   const date = new Date(isoString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();

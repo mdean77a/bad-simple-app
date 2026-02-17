@@ -1,4 +1,4 @@
-import { checkHealth, uploadProtocol, fetchProtocols, ApiError, API_BASE_URL } from "@/lib/api";
+import { checkHealth, uploadProtocol, fetchProtocols, generateOutline, ApiError, API_BASE_URL } from "@/lib/api";
 
 describe("API_BASE_URL", () => {
   it("defaults to localhost:8000 when env var is not set", () => {
@@ -115,6 +115,26 @@ describe("uploadProtocol", () => {
     }
   });
 
+  it("uses fallback code and detail when error body has empty fields", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({}),
+    });
+
+    const file = new File(["data"], "test.pdf", {
+      type: "application/pdf",
+    });
+
+    try {
+      await uploadProtocol(file, "TESTT");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).code).toBe("UNKNOWN_ERROR");
+      expect((err as ApiError).detail).toBe("Upload failed");
+    }
+  });
+
   it("throws generic Error when response body is not JSON", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
@@ -146,6 +166,104 @@ describe("uploadProtocol", () => {
   });
 });
 
+describe("generateOutline", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it("sends POST with protocolId and returns outline on success", async () => {
+    const mockResponse = {
+      protocolId: "protocol_test_123",
+      sections: [
+        {
+          sectionName: "Purpose of the Study",
+          category: "standard",
+          isConditional: false,
+          defaultChecked: true,
+          detectionReason: null,
+        },
+      ],
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockResponse),
+    });
+
+    const result = await generateOutline("protocol_test_123");
+
+    expect(result).toEqual(mockResponse);
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API_BASE_URL}/api/v1/outline/generate`,
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ protocolId: "protocol_test_123" }),
+      })
+    );
+  });
+
+  it("throws ApiError with code and detail on API error", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () =>
+        Promise.resolve({
+          code: "LLM_ERROR",
+          detail: "Model returned invalid JSON",
+        }),
+    });
+
+    await expect(generateOutline("protocol_test_123")).rejects.toThrow(
+      ApiError
+    );
+    try {
+      await generateOutline("protocol_test_123");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).code).toBe("LLM_ERROR");
+      expect((err as ApiError).detail).toBe("Model returned invalid JSON");
+    }
+  });
+
+  it("uses fallback code and detail when error body has empty fields", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.resolve({}),
+    });
+
+    try {
+      await generateOutline("protocol_test_123");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).code).toBe("UNKNOWN_ERROR");
+      expect((err as ApiError).detail).toBe("Outline generation failed");
+    }
+  });
+
+  it("throws generic Error when response body is not JSON", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.reject(new SyntaxError("Unexpected token")),
+    });
+
+    await expect(generateOutline("protocol_test_123")).rejects.toThrow(
+      "Outline generation failed: 500"
+    );
+  });
+
+  it("throws on network error", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(generateOutline("protocol_test_123")).rejects.toThrow(
+      "Failed to fetch"
+    );
+  });
+});
+
 describe("fetchProtocols", () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -167,7 +285,8 @@ describe("fetchProtocols", () => {
     const result = await fetchProtocols();
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `${API_BASE_URL}/api/v1/protocols/`
+      `${API_BASE_URL}/api/v1/protocols/`,
+      { cache: "no-store" }
     );
     expect(result).toEqual(mockProtocols);
   });

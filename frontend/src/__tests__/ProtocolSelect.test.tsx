@@ -116,10 +116,10 @@ describe("ProtocolSelect", () => {
     const select = await screen.findByLabelText("Select a protocol");
     await userEvent.selectOptions(select, "protocol_diabetes_20260203");
 
-    expect(onSelectionChange).toHaveBeenCalledWith(true);
+    expect(onSelectionChange).toHaveBeenCalledWith("protocol_diabetes_20260203");
 
     await userEvent.selectOptions(select, "");
-    expect(onSelectionChange).toHaveBeenCalledWith(false);
+    expect(onSelectionChange).toHaveBeenCalledWith(null);
   });
 
   it("disables dropdown when disabled prop is true", async () => {
@@ -142,6 +142,23 @@ describe("ProtocolSelect", () => {
     const select = await screen.findByLabelText("Select a protocol");
     const option = select.querySelectorAll("option")[1];
     expect(option.textContent).toContain("Indexed today");
+  });
+
+  it("formats a date 3 days ago as '3 days ago'", async () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+    mockFetchProtocols.mockResolvedValue([
+      {
+        protocolId: "test",
+        protocolName: "Recent Protocol",
+        indexedAt: threeDaysAgo,
+      },
+    ]);
+
+    render(<ProtocolSelect />);
+
+    const select = await screen.findByLabelText("Select a protocol");
+    const option = select.querySelectorAll("option")[1];
+    expect(option.textContent).toContain("Indexed 3 days ago");
   });
 
   it("formats yesterday's date as 'yesterday'", async () => {
