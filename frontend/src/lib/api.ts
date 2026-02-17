@@ -43,6 +43,44 @@ export async function fetchProtocols(): Promise<Protocol[]> {
   return response.json();
 }
 
+export interface OutlineSection {
+  sectionName: string;
+  category: "standard" | "conditional" | "signature";
+  isConditional: boolean;
+  defaultChecked: boolean;
+  detectionReason: string | null;
+}
+
+export interface OutlineResult {
+  protocolId: string;
+  sections: OutlineSection[];
+}
+
+export async function generateOutline(
+  protocolId: string
+): Promise<OutlineResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/outline/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ protocolId }),
+  });
+
+  if (!response.ok) {
+    let body: { code?: string; detail?: string };
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error(`Outline generation failed: ${response.status}`);
+    }
+    throw new ApiError(
+      body.code || "UNKNOWN_ERROR",
+      body.detail || "Outline generation failed"
+    );
+  }
+
+  return response.json();
+}
+
 export async function uploadProtocol(
   file: File,
   acronym: string

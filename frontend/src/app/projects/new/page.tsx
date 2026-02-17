@@ -11,8 +11,14 @@ export default function NewProjectPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const [hasFileSelected, setHasFileSelected] = useState(false);
-  const [hasProtocolSelected, setHasProtocolSelected] = useState(false);
-  const [protocolReady, setProtocolReady] = useState(false);
+  const [uploadedProtocolId, setUploadedProtocolId] = useState<string | null>(
+    null
+  );
+  const [selectedProtocolId, setSelectedProtocolId] = useState<string | null>(
+    null
+  );
+
+  const activeProtocolId = uploadedProtocolId || selectedProtocolId;
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -20,14 +26,16 @@ export default function NewProjectPage() {
     }
   }, [isLoading, user, router]);
 
-  const handleUploadSuccess = useCallback(() => {
-    setProtocolReady(true);
+  const handleUploadSuccess = useCallback((protocolId: string) => {
+    setUploadedProtocolId(protocolId);
   }, []);
 
-  const handleSelectionChange = useCallback((hasSelection: boolean) => {
-    setHasProtocolSelected(hasSelection);
-    setProtocolReady(hasSelection);
-  }, []);
+  const handleSelectionChange = useCallback(
+    (protocolId: string | null) => {
+      setSelectedProtocolId(protocolId);
+    },
+    []
+  );
 
   if (isLoading || !user) {
     return null;
@@ -47,7 +55,7 @@ export default function NewProjectPage() {
               Upload New Protocol
             </h2>
             <ProtocolUpload
-              disabled={hasProtocolSelected}
+              disabled={selectedProtocolId !== null}
               onFileChange={setHasFileSelected}
               onUploadSuccess={handleUploadSuccess}
             />
@@ -62,9 +70,16 @@ export default function NewProjectPage() {
             />
           </section>
           <button
-            disabled={!protocolReady}
+            disabled={!activeProtocolId}
+            onClick={() => {
+              if (activeProtocolId) {
+                router.push(
+                  `/projects/${encodeURIComponent(activeProtocolId)}/outline`
+                );
+              }
+            }}
             className={`w-full rounded-lg px-6 py-2.5 font-medium text-white ${
-              protocolReady
+              activeProtocolId
                 ? "bg-violet-600 hover:bg-violet-700"
                 : "bg-violet-300 cursor-not-allowed"
             }`}

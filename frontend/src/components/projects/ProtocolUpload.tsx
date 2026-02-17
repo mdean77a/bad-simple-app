@@ -32,7 +32,6 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
   }, []);
 
   const handleUpload = useCallback(async () => {
-    if (!selectedFile) return;
     const error = validateAcronym(acronym);
     if (error) {
       setAcronymError(error);
@@ -40,7 +39,7 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
     }
     setState({ status: "uploading" });
     try {
-      const result = await uploadProtocol(selectedFile, acronym.trim());
+      const result = await uploadProtocol(selectedFile!, acronym.trim());
       setState({ status: "success", protocolName: result.protocolName });
       onUploadSuccess?.(result.protocolId);
     } catch (err) {
@@ -275,7 +274,7 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
           }}
           placeholder="e.g., THAPCA, FLUID, PRECISE"
           disabled={disabled}
-          className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+          className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 ${
             acronymError
               ? "border-red-300 focus:ring-red-500"
               : "border-slate-300"
