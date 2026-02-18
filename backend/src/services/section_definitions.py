@@ -96,7 +96,9 @@ SIGNATURE_SECTIONS: list[SectionDef] = [
         name="Teen Assent",
         detection_guidance=(
             "Include (defaultChecked=true) if protocol includes "
-            "participants ages 13-17"
+            "participants ages 12-17. IMPORTANT: If the protocol enrolls "
+            "minors (under 18) and does NOT exclude 12-17 year olds, "
+            "Teen Assent IS needed — 'under 18' includes teens."
         ),
     ),
     SectionDef(

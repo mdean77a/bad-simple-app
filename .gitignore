@@ -35,6 +35,9 @@ htmlcov/
 # Protocol PDFs (test documents)
 protocols/
 
+# Debug logs
+outline_llm.log
+
 # OS files
 .DS_Store
 Thumbs.db
