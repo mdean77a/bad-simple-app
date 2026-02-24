@@ -38,6 +38,9 @@ protocols/
 # Debug logs
 outline_llm.log
 
+# Screenshots
+Screenshot*.pdf
+
 # OS files
 .DS_Store
 Thumbs.db
