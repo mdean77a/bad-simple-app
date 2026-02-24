@@ -5,6 +5,10 @@ import { AuthProvider } from "@/lib/auth";
 import { ProjectProvider, useProject } from "@/lib/project";
 import type { ConfirmedOutline, SectionState } from "@/types/project";
 
+jest.mock("@/hooks/useSectionStreaming", () => ({
+  useSectionStreaming: jest.fn(),
+}));
+
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 

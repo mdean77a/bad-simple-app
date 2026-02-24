@@ -7,10 +7,12 @@ import { useProject } from "@/lib/project";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionBar } from "@/components/dashboard/ActionBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
+import { useSectionStreaming } from "@/hooks/useSectionStreaming";
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { project, unconfirmOutline } = useProject();
+  useSectionStreaming();
   const router = useRouter();
   const params = useParams();
   const protocolId = params.id as string;
