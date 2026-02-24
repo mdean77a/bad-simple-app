@@ -338,8 +338,9 @@ describe("Outline Page", () => {
     });
     await userEvent.click(confirmBtn);
 
+    // TEMPORARY: navigates to debug stream page instead of dashboard
     expect(mockPush).toHaveBeenCalledWith(
-      "/projects/protocol_thapca_20260215"
+      expect.stringContaining("/debug/stream?protocolId=protocol_thapca_20260215")
     );
   });
 

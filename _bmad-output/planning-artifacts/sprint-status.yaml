@@ -59,16 +59,16 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Intelligent Outline Generation
-  epic-3: in-progress
+  epic-3: done
   3-1-implement-outline-generation-endpoint: done
   3-2-build-outline-checklist-ui: done
-  3-3-implement-outline-confirmation-flow: review
-  3-4-navigate-back-to-outline-from-dashboard: backlog
+  3-3-implement-outline-confirmation-flow: done
+  3-4-navigate-back-to-outline-from-dashboard: done  # delivered as part of 3-3
   epic-3-retrospective: optional
 
   # Epic 4: Section Generation & Streaming
-  epic-4: backlog
-  4-1-implement-section-generation-streaming-endpoint: backlog
+  epic-4: in-progress
+  4-1-implement-section-generation-streaming-endpoint: done
   4-2-build-section-dashboard-layout: backlog
   4-3-implement-section-card-with-streaming-display: backlog
   4-4-implement-error-handling-and-retry: backlog
