@@ -34,6 +34,10 @@ type ProjectAction =
       type: "UPDATE_CHECKED_STATE";
       payload: Record<string, boolean>;
     }
+  | {
+      type: "UPDATE_SECTION";
+      payload: { id: string; updates: Partial<SectionState> };
+    }
   | { type: "UNCONFIRM_OUTLINE" }
   | { type: "RESET" };
 
@@ -74,6 +78,15 @@ function projectReducer(
           ? { ...state.generatedOutline, checkedState: action.payload }
           : null,
       };
+    case "UPDATE_SECTION":
+      return {
+        ...state,
+        sections: state.sections.map((s) =>
+          s.id === action.payload.id
+            ? { ...s, ...action.payload.updates }
+            : s
+        ),
+      };
     case "UNCONFIRM_OUTLINE":
       return {
         ...state,
@@ -99,6 +112,7 @@ interface ProjectContextType {
     sections: OutlineSection[],
     checkedState: Record<string, boolean>
   ) => void;
+  updateSection: (id: string, updates: Partial<SectionState>) => void;
   updateCheckedState: (checkedState: Record<string, boolean>) => void;
   unconfirmOutline: () => void;
   resetProject: () => void;
@@ -118,6 +132,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       type: "CONFIRM_OUTLINE",
       payload: { protocolId, outline, sections },
     });
+  };
+
+  const updateSection = (id: string, updates: Partial<SectionState>) => {
+    dispatch({ type: "UPDATE_SECTION", payload: { id, updates } });
   };
 
   const cacheGeneratedOutline = (
@@ -148,6 +166,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       value={{
         project,
         confirmOutline,
+        updateSection,
         cacheGeneratedOutline,
         updateCheckedState,
         unconfirmOutline,
