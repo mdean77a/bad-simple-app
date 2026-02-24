@@ -1,8 +1,9 @@
+import type { ReactNode } from "react";
 import type { SectionStatus } from "@/types/project";
 
 const statusConfig: Record<
   SectionStatus,
-  { bg: string; label: string; icon: JSX.Element }
+  { bg: string; label: string; icon: ReactNode }
 > = {
   generating: {
     bg: "bg-amber-400",
