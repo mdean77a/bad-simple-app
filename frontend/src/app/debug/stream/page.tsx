@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { API_BASE_URL } from "@/lib/api";
 
@@ -15,6 +15,14 @@ interface SectionInput {
 }
 
 export default function DebugStreamPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "2rem" }}>Loading...</div>}>
+      <DebugStreamContent />
+    </Suspense>
+  );
+}
+
+function DebugStreamContent() {
   const searchParams = useSearchParams();
 
   const paramProtocolId = searchParams.get("protocolId") || "";
