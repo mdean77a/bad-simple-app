@@ -199,7 +199,7 @@ describe("PageHeader", () => {
       renderPageHeader({ title: "Test", showBack: true, onBack: jest.fn() });
 
       const backButton = screen.getByRole("button", { name: /go back/i });
-      expect(backButton).toHaveAttribute("aria-label", "Go back");
+      expect(backButton).toHaveAttribute("aria-label", "Go back to Back");
     });
 
     it("logout button is keyboard accessible via Enter", async () => {

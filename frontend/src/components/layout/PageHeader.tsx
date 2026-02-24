@@ -5,25 +5,31 @@ import { useAuth } from "@/lib/auth";
 interface PageHeaderProps {
   title?: string;
   showBack?: boolean;
+  backLabel?: string;
   onBack?: () => void;
 }
 
-export function PageHeader({ title, showBack, onBack }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  showBack,
+  backLabel = "Back",
+  onBack,
+}: PageHeaderProps) {
   const { user, logout } = useAuth();
 
   return (
     <header className="border-b border-slate-200 bg-white" role="banner">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+      <div className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           {showBack && (
             <button
               onClick={onBack}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:ring-offset-2"
-              aria-label="Go back"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:ring-offset-2"
+              aria-label={`Go back to ${backLabel}`}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
+                className="h-4 w-4"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -33,12 +39,15 @@ export function PageHeader({ title, showBack, onBack }: PageHeaderProps) {
                   clipRule="evenodd"
                 />
               </svg>
+              {backLabel}
             </button>
           )}
-          {title && (
-            <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-          )}
         </div>
+        {title && (
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-slate-900">
+            {title}
+          </h1>
+        )}
         <div className="flex items-center gap-3">
           {user && (
             <span className="text-sm text-slate-600">{user.name}</span>

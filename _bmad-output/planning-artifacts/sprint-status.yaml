@@ -62,7 +62,7 @@ development_status:
   epic-3: in-progress
   3-1-implement-outline-generation-endpoint: done
   3-2-build-outline-checklist-ui: done
-  3-3-implement-outline-confirmation-flow: backlog
+  3-3-implement-outline-confirmation-flow: review
   3-4-navigate-back-to-outline-from-dashboard: backlog
   epic-3-retrospective: optional
 

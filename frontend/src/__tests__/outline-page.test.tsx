@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import OutlinePage from "@/app/projects/[id]/outline/page";
 import { AuthProvider } from "@/lib/auth";
+import { ProjectProvider } from "@/lib/project";
 import * as api from "@/lib/api";
 
 const mockPush = jest.fn();
@@ -61,7 +62,9 @@ const mockSections: api.OutlineSection[] = [
 const renderPage = () => {
   return render(
     <AuthProvider>
-      <OutlinePage />
+      <ProjectProvider>
+        <OutlinePage />
+      </ProjectProvider>
     </AuthProvider>
   );
 };
@@ -258,5 +261,105 @@ describe("Outline Page", () => {
         "protocol_thapca_20260215"
       );
     });
+  });
+
+  it("shows Confirm Outline button when outline is loaded", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+    mockGenerateOutline.mockResolvedValue({
+      protocolId: "protocol_thapca_20260215",
+      sections: mockSections,
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Confirm outline and begin generation",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("disables Confirm button when all sections are unchecked", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+    mockGenerateOutline.mockResolvedValue({
+      protocolId: "protocol_thapca_20260215",
+      sections: mockSections,
+    });
+
+    renderPage();
+
+    await screen.findByText("Purpose of the Study");
+
+    // Uncheck all sections (all are defaultChecked: true)
+    const checkboxes = screen.getAllByRole("checkbox");
+    for (const cb of checkboxes) {
+      await userEvent.click(cb);
+    }
+
+    const confirmBtn = screen.getByRole("button", {
+      name: "Confirm outline and begin generation",
+    });
+    expect(confirmBtn).toBeDisabled();
+    expect(
+      screen.getByText("Select at least one section to continue")
+    ).toBeInTheDocument();
+  });
+
+  it("navigates to dashboard on confirm click", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+    mockGenerateOutline.mockResolvedValue({
+      protocolId: "protocol_thapca_20260215",
+      sections: mockSections,
+    });
+
+    // Mock crypto.randomUUID for deterministic test
+    const mockUUID = jest.fn(() => "test-uuid-1234");
+    Object.defineProperty(globalThis.crypto, "randomUUID", {
+      value: mockUUID,
+      writable: true,
+      configurable: true,
+    });
+
+    renderPage();
+
+    await screen.findByText("Purpose of the Study");
+
+    const confirmBtn = screen.getByRole("button", {
+      name: "Confirm outline and begin generation",
+    });
+    await userEvent.click(confirmBtn);
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/projects/protocol_thapca_20260215"
+    );
+  });
+
+  it("does not show Confirm button during loading state", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+    mockGenerateOutline.mockReturnValue(new Promise(() => {}));
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Generating outline...")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Confirm outline and begin generation",
+      })
+    ).not.toBeInTheDocument();
   });
 });

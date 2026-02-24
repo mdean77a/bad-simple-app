@@ -53,7 +53,7 @@ describe("New Project Page", () => {
     });
   });
 
-  it("renders page header with New Project title", async () => {
+  it("renders page header with Select Protocol title", async () => {
     localStorage.setItem(
       "user",
       JSON.stringify({ name: "Jane", email: "jane@example.com" })
@@ -63,7 +63,7 @@ describe("New Project Page", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { level: 1, name: "New Project" })
+        screen.getByRole("heading", { level: 1, name: "Select Protocol" })
       ).toBeInTheDocument();
     });
   });
