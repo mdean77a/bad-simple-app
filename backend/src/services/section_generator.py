@@ -1,9 +1,9 @@
 import logging
 from collections.abc import AsyncGenerator
 
+from langchain.agents import create_agent
 from langchain_core.messages import AIMessageChunk
 from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
 
 from src.services.llm_factory import LLMConfigError, get_chat_model
 from src.services.vector_store import VectorStoreError, search_protocol
@@ -74,10 +74,10 @@ async def generate_section_stream(
         except Exception as exc:
             raise VectorStoreError(f"Protocol search failed: {exc}") from exc
 
-    agent = create_react_agent(
+    agent = create_agent(
         model=model,
         tools=[search_protocol_chunks],
-        prompt=SYSTEM_PROMPT,
+        system_prompt=SYSTEM_PROMPT,
     )
 
     user_message = _build_user_message(section_name)

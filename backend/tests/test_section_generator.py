@@ -31,7 +31,7 @@ def test_build_user_message():
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_yields_chunks(mock_create_agent, mock_get_model):
     """Streaming yields content strings from the agent."""
     mock_get_model.return_value = MagicMock()
@@ -55,7 +55,7 @@ async def test_generate_section_stream_yields_chunks(mock_create_agent, mock_get
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_skips_tool_call_chunks(
     mock_create_agent, mock_get_model
 ):
@@ -85,7 +85,7 @@ async def test_generate_section_stream_skips_tool_call_chunks(
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_skips_non_ai_messages(
     mock_create_agent, mock_get_model
 ):
@@ -110,7 +110,7 @@ async def test_generate_section_stream_skips_non_ai_messages(
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_handles_list_content_blocks(
     mock_create_agent, mock_get_model
 ):
@@ -151,7 +151,7 @@ async def test_generate_section_stream_llm_config_error(mock_get_model):
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_vector_store_error(
     mock_create_agent, mock_get_model
 ):
@@ -173,7 +173,7 @@ async def test_generate_section_stream_vector_store_error(
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_retries_on_generic_error(
     mock_create_agent, mock_get_model
 ):
@@ -201,7 +201,7 @@ async def test_generate_section_stream_retries_on_generic_error(
 
 @pytest.mark.asyncio
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_generate_section_stream_empty_content_skipped(
     mock_create_agent, mock_get_model
 ):
@@ -229,7 +229,7 @@ async def test_generate_section_stream_empty_content_skipped(
 @pytest.mark.asyncio
 @patch("src.services.section_generator.search_protocol")
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_tool_returns_joined_chunks(
     mock_create_agent, mock_get_model, mock_search
 ):
@@ -239,7 +239,7 @@ async def test_tool_returns_joined_chunks(
 
     captured_tool = None
 
-    def capture_agent(model, tools, prompt):
+    def capture_agent(model, tools, **kwargs):
         nonlocal captured_tool
         captured_tool = tools[0]
         agent = MagicMock()
@@ -267,7 +267,7 @@ async def test_tool_returns_joined_chunks(
 @pytest.mark.asyncio
 @patch("src.services.section_generator.search_protocol")
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_tool_returns_fallback_when_no_chunks(
     mock_create_agent, mock_get_model, mock_search
 ):
@@ -277,7 +277,7 @@ async def test_tool_returns_fallback_when_no_chunks(
 
     captured_tool = None
 
-    def capture_agent(model, tools, prompt):
+    def capture_agent(model, tools, **kwargs):
         nonlocal captured_tool
         captured_tool = tools[0]
         agent = MagicMock()
@@ -301,7 +301,7 @@ async def test_tool_returns_fallback_when_no_chunks(
 @pytest.mark.asyncio
 @patch("src.services.section_generator.search_protocol")
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_tool_propagates_vector_store_error(
     mock_create_agent, mock_get_model, mock_search
 ):
@@ -311,7 +311,7 @@ async def test_tool_propagates_vector_store_error(
 
     captured_tool = None
 
-    def capture_agent(model, tools, prompt):
+    def capture_agent(model, tools, **kwargs):
         nonlocal captured_tool
         captured_tool = tools[0]
         agent = MagicMock()
@@ -335,7 +335,7 @@ async def test_tool_propagates_vector_store_error(
 @pytest.mark.asyncio
 @patch("src.services.section_generator.search_protocol")
 @patch("src.services.section_generator.get_chat_model")
-@patch("src.services.section_generator.create_react_agent")
+@patch("src.services.section_generator.create_agent")
 async def test_tool_wraps_generic_error_as_vector_store_error(
     mock_create_agent, mock_get_model, mock_search
 ):
@@ -345,7 +345,7 @@ async def test_tool_wraps_generic_error_as_vector_store_error(
 
     captured_tool = None
 
-    def capture_agent(model, tools, prompt):
+    def capture_agent(model, tools, **kwargs):
         nonlocal captured_tool
         captured_tool = tools[0]
         agent = MagicMock()
