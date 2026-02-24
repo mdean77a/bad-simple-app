@@ -72,7 +72,7 @@ development_status:
   4-2-build-section-dashboard-layout: backlog
   4-3-implement-section-card-with-streaming-display: backlog
   4-4-implement-error-handling-and-retry: backlog
-  4-5-handle-outline-modifications: backlog
+  4-5-handle-outline-modifications: dropped  # deemed unnecessary
   epic-4-retrospective: optional
 
   # Epic 5: Section Review Workflow
