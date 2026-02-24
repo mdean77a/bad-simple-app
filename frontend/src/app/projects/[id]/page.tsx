@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useProject } from "@/lib/project";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ActionBar } from "@/components/dashboard/ActionBar";
+import { SectionCard } from "@/components/dashboard/SectionCard";
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -34,27 +36,24 @@ export default function DashboardPage() {
           router.push(`/projects/${protocolId}/outline`);
         }}
       />
-      <div className="flex flex-1 flex-col items-center px-4 pt-12">
-        <div className="w-full max-w-3xl">
-          <div className="space-y-3">
-            {project.sections.map((section) => (
-              <div
-                key={section.id}
-                className="rounded-lg border border-slate-200 bg-white p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-800">
-                    {section.name}
-                  </span>
-                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                    {section.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+      <ActionBar />
+      <main className="flex-1 px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          {project.sections.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-sm text-slate-500">
+                No sections in this outline.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {project.sections.map((section) => (
+                <SectionCard key={section.id} section={section} />
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

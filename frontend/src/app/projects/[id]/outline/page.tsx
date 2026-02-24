@@ -108,11 +108,7 @@ export default function OutlinePage() {
     }));
 
     confirmOutline(protocolId, outline, sections);
-    // TEMPORARY: navigate to debug stream page instead of dashboard
-    const sectionParams = encodeURIComponent(JSON.stringify(
-      sections.map((s) => ({ id: s.id, name: s.name }))
-    ));
-    router.push(`/debug/stream?protocolId=${protocolId}&sections=${sectionParams}`);
+    router.push(`/projects/${protocolId}`);
   }, [user, state, checkedState, protocolId, confirmOutline, router]);
 
   if (authLoading || !user) {

@@ -33,8 +33,8 @@ const mockSections: SectionState[] = [
   {
     id: "uuid-2",
     name: "Study Procedures",
-    content: "",
-    status: "generating",
+    content: "The study will involve several procedures.",
+    status: "ready",
     originalPrompt: "",
   },
 ];
@@ -73,7 +73,7 @@ const renderWithOutline = () => {
   );
 };
 
-describe("Dashboard Placeholder Page", () => {
+describe("Dashboard Page", () => {
   beforeEach(() => {
     localStorage.clear();
     mockPush.mockReset();
@@ -102,11 +102,10 @@ describe("Dashboard Placeholder Page", () => {
       </AuthProvider>
     );
 
-    expect(screen.queryByText("Outline Confirmed")).not.toBeInTheDocument();
     expect(screen.queryByText("Section Dashboard")).not.toBeInTheDocument();
   });
 
-  it("renders section cards with names and statuses", async () => {
+  it("renders section cards with names", async () => {
     localStorage.setItem(
       "user",
       JSON.stringify({ name: "Jane", email: "jane@example.com" })
@@ -115,12 +114,59 @@ describe("Dashboard Placeholder Page", () => {
     renderWithOutline();
 
     await waitFor(() => {
-      expect(screen.getByText("Purpose of the Study")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 3, name: "Purpose of the Study" })
+      ).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Study Procedures")).toBeInTheDocument();
-    const statusBadges = screen.getAllByText("generating");
-    expect(statusBadges).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Study Procedures" })
+    ).toBeInTheDocument();
+  });
+
+  it("renders ActionBar with ICF Sections heading", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "ICF Sections" })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders section cards as articles", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(2);
+    });
+  });
+
+  it("shows skeleton for generating section and content for ready section", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("section-skeleton")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText("The study will involve several procedures.")
+    ).toBeInTheDocument();
   });
 
   it("navigates to outline page when 'Change Outline' back button is clicked", async () => {
@@ -156,7 +202,9 @@ describe("Dashboard Placeholder Page", () => {
 
     // After unconfirm, outline is null so section cards disappear
     await waitFor(() => {
-      expect(screen.queryByText("Purpose of the Study")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { level: 3, name: "Purpose of the Study" })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -172,6 +220,19 @@ describe("Dashboard Placeholder Page", () => {
       expect(
         screen.getByRole("heading", { level: 1, name: "Section Dashboard" })
       ).toBeInTheDocument();
+    });
+  });
+
+  it("wraps sections in a main element", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    await waitFor(() => {
+      expect(screen.getByRole("main")).toBeInTheDocument();
     });
   });
 });

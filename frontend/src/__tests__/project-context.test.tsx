@@ -26,6 +26,7 @@ function TestConsumer() {
   const {
     project,
     confirmOutline,
+    updateSection,
     cacheGeneratedOutline,
     updateCheckedState,
     unconfirmOutline,
@@ -99,6 +100,13 @@ function TestConsumer() {
         onClick={() => updateCheckedState({ Purpose: false, Risks: true })}
       >
         Toggle
+      </button>
+      <button
+        onClick={() =>
+          updateSection("uuid-1", { content: "Updated content", status: "ready" })
+        }
+      >
+        UpdateSection
       </button>
       <button onClick={unconfirmOutline}>Unconfirm</button>
       <button onClick={resetProject}>Reset</button>
@@ -204,6 +212,24 @@ describe("ProjectContext", () => {
     expect(screen.getByTestId("has-outline")).toHaveTextContent("no");
     expect(screen.getByTestId("section-count")).toHaveTextContent("0");
     expect(screen.getByTestId("has-generated")).toHaveTextContent("yes");
+  });
+
+  it("updates a specific section via updateSection", async () => {
+    render(
+      <ProjectProvider>
+        <TestConsumer />
+      </ProjectProvider>
+    );
+
+    await userEvent.click(screen.getByText("Confirm"));
+    expect(screen.getByTestId("section-Purpose")).toHaveTextContent(
+      "generating"
+    );
+
+    await userEvent.click(screen.getByText("UpdateSection"));
+    expect(screen.getByTestId("section-Purpose")).toHaveTextContent("ready");
+    // Risks section should be unchanged
+    expect(screen.getByTestId("section-Risks")).toHaveTextContent("generating");
   });
 
   it("throws error when useProject is used outside ProjectProvider", () => {
