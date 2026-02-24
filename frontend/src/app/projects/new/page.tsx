@@ -44,8 +44,9 @@ export default function NewProjectPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <PageHeader
-        title="New Project"
+        title="Select Protocol"
         showBack
+        backLabel="Home"
         onBack={() => router.push("/")}
       />
       <div className="flex flex-1 flex-col items-center px-4 pt-12">
