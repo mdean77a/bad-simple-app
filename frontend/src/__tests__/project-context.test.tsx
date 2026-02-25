@@ -232,6 +232,20 @@ describe("ProjectContext", () => {
     expect(screen.getByTestId("section-Risks")).toHaveTextContent("generating");
   });
 
+  it("updateCheckedState is no-op when no generated outline exists", async () => {
+    render(
+      <ProjectProvider>
+        <TestConsumer />
+      </ProjectProvider>
+    );
+
+    // Toggle without caching first — generatedOutline is null
+    await userEvent.click(screen.getByText("Toggle"));
+
+    expect(screen.getByTestId("has-generated")).toHaveTextContent("no");
+    expect(screen.getByTestId("checked-state")).toHaveTextContent("null");
+  });
+
   it("throws error when useProject is used outside ProjectProvider", () => {
     const consoleSpy = jest
       .spyOn(console, "error")

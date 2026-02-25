@@ -169,6 +169,24 @@ def test_generate_outline_llm_config_error_not_retried(mock_search, mock_get_mod
 
 @patch("src.services.rag_pipeline.get_chat_model")
 @patch("src.services.rag_pipeline.search_protocol")
+def test_generate_outline_llm_config_error_in_invoke(mock_search, mock_get_model):
+    """LLMConfigError from structured.invoke is raised immediately without retrying."""
+    mock_search.return_value = ["Protocol content"]
+
+    mock_model = MagicMock()
+    mock_structured = MagicMock()
+    mock_model.with_structured_output.return_value = mock_structured
+    mock_structured.invoke.side_effect = LLMConfigError("API key invalid")
+    mock_get_model.return_value = mock_model
+
+    with pytest.raises(LLMConfigError, match="API key invalid"):
+        generate_outline("protocol_test_123")
+
+    assert mock_structured.invoke.call_count == 1
+
+
+@patch("src.services.rag_pipeline.get_chat_model")
+@patch("src.services.rag_pipeline.search_protocol")
 def test_generate_outline_returns_dicts(mock_search, mock_get_model):
     """Result is a list of plain dicts, not Pydantic models."""
     mock_search.return_value = ["Protocol content"]

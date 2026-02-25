@@ -205,6 +205,23 @@ def test_search_protocol_wraps_errors(mock_settings, mock_client_cls, mock_vs_cl
 @patch("src.services.vector_store.QdrantVectorStore")
 @patch("src.services.vector_store.QdrantClient")
 @patch("src.services.vector_store.settings")
+def test_search_protocol_reraises_vector_store_error(mock_settings, mock_client_cls, mock_vs_cls):
+    """VectorStoreError from similarity_search is re-raised unchanged (not double-wrapped)."""
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+    mock_settings.openai_api_key = "openai-key"
+
+    mock_store = MagicMock()
+    mock_vs_cls.return_value = mock_store
+    mock_store.similarity_search.side_effect = VectorStoreError("Already a VectorStoreError")
+
+    with pytest.raises(VectorStoreError, match="Already a VectorStoreError"):
+        search_protocol("protocol_test_123", "query")
+
+
+@patch("src.services.vector_store.QdrantVectorStore")
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
 def test_search_protocol_empty_results(mock_settings, mock_client_cls, mock_vs_cls):
     mock_settings.qdrant_url = "https://qdrant.example.com"
     mock_settings.qdrant_api_key = "qdrant-key"
@@ -385,3 +402,18 @@ def test_list_protocols_skips_empty_collections(mock_settings, mock_client_cls):
 
     assert len(result) == 1
     assert result[0]["protocolName"] == "Has Points"
+
+
+@patch("src.services.vector_store.QdrantClient")
+@patch("src.services.vector_store.settings")
+def test_list_protocols_reraises_vector_store_error(mock_settings, mock_client_cls):
+    """VectorStoreError from QdrantClient is re-raised unchanged (not double-wrapped)."""
+    mock_settings.qdrant_url = "https://qdrant.example.com"
+    mock_settings.qdrant_api_key = "qdrant-key"
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.get_collections.side_effect = VectorStoreError("Already wrapped")
+
+    with pytest.raises(VectorStoreError, match="Already wrapped"):
+        list_protocols()
