@@ -77,6 +77,30 @@ const renderWithOutline = () => {
   );
 };
 
+// Helper for tests that need a custom set of sections
+function CustomSeeder({ sections }: { sections: SectionState[] }) {
+  const { confirmOutline } = useProject();
+  const [seeded, setSeeded] = React.useState(false);
+  React.useEffect(() => {
+    if (!seeded) {
+      confirmOutline("protocol_test_123", mockOutline, sections);
+      setSeeded(true);
+    }
+  }, [seeded, confirmOutline, sections]);
+  return null;
+}
+
+const renderWithSections = (sections: SectionState[]) => {
+  return render(
+    <AuthProvider>
+      <ProjectProvider>
+        <CustomSeeder sections={sections} />
+        <DashboardPage />
+      </ProjectProvider>
+    </AuthProvider>
+  );
+};
+
 describe("Dashboard Page", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -260,5 +284,142 @@ describe("Dashboard Page", () => {
     await waitFor(() => {
       expect(screen.getByRole("main")).toBeInTheDocument();
     });
+  });
+
+  // --- Inline editing integration tests ---
+
+  it("clicking Edit on a ready section changes status to editing", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    const editBtn = await screen.findByRole("button", {
+      name: /edit study procedures/i,
+    });
+    await userEvent.click(editBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Editing/)).toBeInTheDocument();
+    });
+    // Textarea should be visible
+    expect(
+      screen.getByRole("textbox", { name: /edit content for study procedures/i })
+    ).toBeInTheDocument();
+  });
+
+  it("editing text and clicking Save changes status to edited and updates content", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    const editBtn = await screen.findByRole("button", {
+      name: /edit study procedures/i,
+    });
+    await userEvent.click(editBtn);
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for study procedures/i,
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "Updated procedures content.");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /save study procedures/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Edited/)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("Updated procedures content.")
+    ).toBeInTheDocument();
+  });
+
+  it("clicking Cancel restores original status and content", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    const editBtn = await screen.findByRole("button", {
+      name: /edit study procedures/i,
+    });
+    await userEvent.click(editBtn);
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for study procedures/i,
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "Temporary changes");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /cancel editing study procedures/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Ready for review/)).toBeInTheDocument();
+    });
+    // Original content should be shown (not the temporary changes)
+    expect(
+      screen.getByText("The study will involve several procedures.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Temporary changes")).not.toBeInTheDocument();
+  });
+
+  it("saving edits to an approved section clears approval and sets status to edited", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const approvedSections: SectionState[] = [
+      {
+        id: "uuid-approved",
+        name: "Approved Section",
+        content: "Previously approved content.",
+        status: "approved",
+        originalPrompt: "",
+        approval: {
+          userName: "Jane",
+          userEmail: "jane@example.com",
+          timestamp: "2026-02-25T10:00:00Z",
+        },
+      },
+    ];
+
+    renderWithSections(approvedSections);
+
+    // Approved section should show Edit button but not Approve button
+    const editBtn = await screen.findByRole("button", {
+      name: /edit approved section/i,
+    });
+    await userEvent.click(editBtn);
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for approved section/i,
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "Newly edited content.");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /save approved section/i })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Edited/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("Newly edited content.")).toBeInTheDocument();
+    // Approve button should now be visible again (status is no longer approved)
+    expect(
+      screen.getByRole("button", { name: /approve approved section/i })
+    ).toBeInTheDocument();
   });
 });

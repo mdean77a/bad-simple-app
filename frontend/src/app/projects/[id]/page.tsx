@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useProject } from "@/lib/project";
@@ -8,10 +8,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionBar } from "@/components/dashboard/ActionBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { useSectionStreaming } from "@/hooks/useSectionStreaming";
+import type { SectionStatus } from "@/types/project";
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { project, unconfirmOutline, updateSection } = useProject();
+
+  // Track previous status for cancel restoration
+  const prevStatusRef = useRef<Record<string, SectionStatus>>({});
 
   const handleApprove = (sectionId: string) => {
     if (!user) return;
@@ -24,6 +28,30 @@ export default function DashboardPage() {
       },
     });
   };
+
+  const handleEdit = (sectionId: string) => {
+    const section = project.sections.find((s) => s.id === sectionId);
+    if (section) {
+      prevStatusRef.current[sectionId] = section.status;
+    }
+    updateSection(sectionId, { status: "editing" });
+  };
+
+  const handleSave = (sectionId: string, newContent: string) => {
+    updateSection(sectionId, {
+      status: "edited",
+      content: newContent,
+      approval: undefined,
+    });
+    delete prevStatusRef.current[sectionId];
+  };
+
+  const handleCancel = (sectionId: string) => {
+    const previousStatus = prevStatusRef.current[sectionId] || "ready";
+    updateSection(sectionId, { status: previousStatus });
+    delete prevStatusRef.current[sectionId];
+  };
+
   useSectionStreaming();
   const router = useRouter();
   const params = useParams();
@@ -66,6 +94,9 @@ export default function DashboardPage() {
                   key={section.id}
                   section={section}
                   onApprove={() => handleApprove(section.id)}
+                  onEdit={() => handleEdit(section.id)}
+                  onSave={(content) => handleSave(section.id, content)}
+                  onCancel={() => handleCancel(section.id)}
                 />
               ))}
             </div>
