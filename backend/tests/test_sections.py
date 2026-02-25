@@ -274,7 +274,7 @@ REGEN_PAYLOAD = {
     "protocolId": "protocol_test_123",
     "sectionId": "sec-1",
     "sectionName": "Purpose of the Study",
-    "originalPrompt": "Write the Purpose section",
+    "currentContent": "This study evaluates the safety of the treatment.",
 }
 
 

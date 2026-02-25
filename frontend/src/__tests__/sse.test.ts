@@ -240,13 +240,13 @@ async function collectRegenEvents(
   protocolId: string,
   sectionId: string,
   sectionName: string,
-  originalPrompt: string,
+  currentContent: string,
   guidance: string | null,
   signal?: AbortSignal,
 ): Promise<SSEEvent[]> {
   const events: SSEEvent[] = [];
   for await (const event of streamSectionRegenerate(
-    protocolId, sectionId, sectionName, originalPrompt, guidance, signal,
+    protocolId, sectionId, sectionName, currentContent, guidance, signal,
   )) {
     events.push(event);
   }
@@ -254,12 +254,12 @@ async function collectRegenEvents(
 }
 
 describe("streamSectionRegenerate", () => {
-  it("sends correct fetch parameters", async () => {
+  it("sends correct fetch parameters with currentContent", async () => {
     const sseText =
       'event: section_start\ndata: {"sectionId":"s1","name":"Purpose"}\n\n';
     mockFetchSSE(sseText);
 
-    await collectRegenEvents("proto_abc", "s1", "Purpose", "Write it", "Be concise");
+    await collectRegenEvents("proto_abc", "s1", "Purpose", "Existing content.", "Be concise");
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/v1/sections/regenerate"),
@@ -270,7 +270,7 @@ describe("streamSectionRegenerate", () => {
           protocolId: "proto_abc",
           sectionId: "s1",
           sectionName: "Purpose",
-          originalPrompt: "Write it",
+          currentContent: "Existing content.",
           guidance: "Be concise",
         }),
       }),
@@ -282,11 +282,12 @@ describe("streamSectionRegenerate", () => {
       'event: section_start\ndata: {"sectionId":"s1","name":"Purpose"}\n\n';
     mockFetchSSE(sseText);
 
-    await collectRegenEvents("proto_abc", "s1", "Purpose", "Write it", null);
+    await collectRegenEvents("proto_abc", "s1", "Purpose", "Content here.", null);
 
     const call = (globalThis.fetch as jest.Mock).mock.calls[0];
     const body = JSON.parse(call[1].body);
     expect(body.guidance).toBeNull();
+    expect(body.currentContent).toBe("Content here.");
   });
 
   it("parses full SSE event sequence", async () => {
@@ -297,7 +298,7 @@ describe("streamSectionRegenerate", () => {
       'event: section_complete\ndata: {"sectionId":"s1","status":"ready"}\n\n';
     mockFetchSSE(sseText);
 
-    const events = await collectRegenEvents("proto1", "s1", "Purpose", "Write it", null);
+    const events = await collectRegenEvents("proto1", "s1", "Purpose", "Old content.", null);
 
     expect(events).toHaveLength(4);
     expect(events[0]).toEqual({ event: "section_start", sectionId: "s1", name: "Purpose" });
@@ -311,7 +312,7 @@ describe("streamSectionRegenerate", () => {
       'event: section_error\ndata: {"sectionId":"s1","message":"LLM failed"}\n\n';
     mockFetchSSE(sseText);
 
-    const events = await collectRegenEvents("proto1", "s1", "Purpose", "Write it", null);
+    const events = await collectRegenEvents("proto1", "s1", "Purpose", "Content.", null);
 
     expect(events).toEqual([
       { event: "section_error", sectionId: "s1", message: "LLM failed" },
@@ -327,7 +328,7 @@ describe("streamSectionRegenerate", () => {
     });
 
     await expect(
-      collectRegenEvents("proto1", "s1", "Purpose", "Write it", null)
+      collectRegenEvents("proto1", "s1", "Purpose", "Content.", null)
     ).rejects.toThrow("Stream request failed: 500 Internal Server Error");
   });
 });

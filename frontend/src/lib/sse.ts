@@ -72,14 +72,14 @@ export async function* streamSectionRegenerate(
   protocolId: string,
   sectionId: string,
   sectionName: string,
-  originalPrompt: string,
+  currentContent: string,
   guidance: string | null,
   signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
   const response = await fetch(`${API_BASE_URL}/api/v1/sections/regenerate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ protocolId, sectionId, sectionName, originalPrompt, guidance }),
+    body: JSON.stringify({ protocolId, sectionId, sectionName, currentContent, guidance }),
     signal,
   });
 

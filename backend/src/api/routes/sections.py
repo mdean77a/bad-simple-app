@@ -21,7 +21,7 @@ class RegenerateSectionRequest(BaseModel):
     protocolId: str
     sectionId: str
     sectionName: str
-    originalPrompt: str
+    currentContent: str
     guidance: str | None = None
 
 
@@ -65,7 +65,7 @@ async def regenerate_section_endpoint(request: RegenerateSectionRequest):
             protocol_id=request.protocolId,
             section_id=request.sectionId,
             section_name=request.sectionName,
-            original_prompt=request.originalPrompt,
+            current_content=request.currentContent,
             guidance=request.guidance,
         ):
             yield event_str

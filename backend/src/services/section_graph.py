@@ -77,19 +77,37 @@ def _build_messages(section_name: str, context: str) -> list:
 MAX_RETRIES = 3
 
 
+REGENERATE_SYSTEM_PROMPT = """\
+You are an expert clinical research writer specializing in Informed Consent Forms (ICFs).
+
+You are revising a specific section of an ICF. You will be given:
+1. The relevant clinical trial protocol content for reference
+2. The current version of the section
+3. Revision guidance from a reviewer
+
+Instructions:
+- Revise the section based on the reviewer's guidance
+- Keep the content grounded in the protocol — do NOT invent study details
+- Write clear, accessible language appropriate for research participants
+- Use plain language — avoid jargon or explain technical terms when necessary
+
+Write the revised section content directly. Do not include the section title as a heading — \
+just write the body text for the section."""
+
+
 async def stream_section_regenerate(
     protocol_id: str,
     section_id: str,
     section_name: str,
-    original_prompt: str,
+    current_content: str,
     guidance: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Yield SSE events for regenerating a single section.
 
-    Retrieves protocol context via RAG, builds the prompt (with optional
-    guidance), and streams the LLM response token-by-token.  Retries up
-    to MAX_RETRIES times on transient failures; re-raises VectorStoreError
-    and LLMConfigError immediately.
+    Retrieves protocol context via RAG, builds a revision prompt with the
+    current content and reviewer guidance, and streams the LLM response
+    token-by-token.  Retries up to MAX_RETRIES times on transient failures;
+    re-raises VectorStoreError and LLMConfigError immediately.
     """
     yield _sse_event("section_start", {"sectionId": section_id, "name": section_name})
 
@@ -126,14 +144,17 @@ async def stream_section_regenerate(
 
     context = "\n\n---\n\n".join(chunks)
     human_content = (
-        f'Write the "{section_name}" section of an Informed Consent Form.\n\n'
-        f"Relevant protocol content:\n\n{context}"
+        f'Revise the "{section_name}" section of an Informed Consent Form.\n\n'
+        f"Relevant protocol content:\n\n{context}\n\n"
+        f"Current version of this section:\n\n{current_content}"
     )
     if guidance:
-        human_content += f"\n\nAdditional guidance from the reviewer:\n{guidance}"
+        human_content += f"\n\nReviewer guidance:\n{guidance}"
+    else:
+        human_content += "\n\nPlease improve the clarity and quality of this section."
 
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(content=REGENERATE_SYSTEM_PROMPT),
         HumanMessage(content=human_content),
     ]
 

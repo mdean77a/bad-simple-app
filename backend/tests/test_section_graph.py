@@ -584,7 +584,7 @@ async def test_regen_success_stream(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write the Purpose section",
+        current_content="This study evaluates safety.",
     ):
         raw_events.append(event_str)
 
@@ -606,11 +606,13 @@ async def test_regen_success_stream(mock_get_model, mock_search):
 @pytest.mark.asyncio
 @patch("src.services.section_graph.search_protocol")
 @patch("src.services.section_graph.get_chat_model")
-async def test_regen_guidance_appended_to_prompt(mock_get_model, mock_search):
-    """When guidance is provided, it appears in the messages passed to the LLM."""
+async def test_regen_prompt_includes_current_content_and_context(
+    mock_get_model, mock_search,
+):
+    """Prompt includes RAG context, current content, and revision framing."""
     from langchain_core.messages import AIMessageChunk
 
-    mock_search.return_value = ["Protocol context"]
+    mock_search.return_value = ["Protocol context about dosing"]
     model = AsyncMock()
     captured_messages = []
 
@@ -626,22 +628,27 @@ async def test_regen_guidance_appended_to_prompt(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write the Purpose section",
+        current_content="This study evaluates safety.",
         guidance="Be more concise",
     ):
         raw_events.append(event_str)
 
-    # Verify guidance is in the human message
+    system_msg = captured_messages[0]
+    assert "revising" in system_msg.content.lower()
+
     human_msg = captured_messages[1]
-    assert "Additional guidance from the reviewer:" in human_msg.content
+    assert 'Revise the "Purpose"' in human_msg.content
+    assert "Protocol context about dosing" in human_msg.content
+    assert "This study evaluates safety." in human_msg.content
+    assert "Reviewer guidance:" in human_msg.content
     assert "Be more concise" in human_msg.content
 
 
 @pytest.mark.asyncio
 @patch("src.services.section_graph.search_protocol")
 @patch("src.services.section_graph.get_chat_model")
-async def test_regen_no_guidance_not_in_prompt(mock_get_model, mock_search):
-    """Without guidance, the 'Additional guidance' text is NOT in the prompt."""
+async def test_regen_no_guidance_uses_default_instruction(mock_get_model, mock_search):
+    """Without guidance, a default improvement instruction is used."""
     from langchain_core.messages import AIMessageChunk
 
     mock_search.return_value = ["Protocol context"]
@@ -660,12 +667,14 @@ async def test_regen_no_guidance_not_in_prompt(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write the Purpose section",
+        current_content="Existing content here.",
     ):
         raw_events.append(event_str)
 
     human_msg = captured_messages[1]
-    assert "Additional guidance" not in human_msg.content
+    assert "Existing content here." in human_msg.content
+    assert "Reviewer guidance:" not in human_msg.content
+    assert "improve the clarity" in human_msg.content
 
 
 @pytest.mark.asyncio
@@ -679,7 +688,7 @@ async def test_regen_llm_config_error(mock_get_model):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write it",
+        current_content="Existing content.",
     ):
         raw_events.append(event_str)
 
@@ -702,7 +711,7 @@ async def test_regen_vector_store_error(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write it",
+        current_content="Existing content.",
     ):
         raw_events.append(event_str)
 
@@ -725,7 +734,7 @@ async def test_regen_empty_rag_results(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write it",
+        current_content="Existing content.",
     ):
         raw_events.append(event_str)
 
@@ -760,7 +769,7 @@ async def test_regen_retries_on_transient_failure(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write it",
+        current_content="Existing content.",
     ):
         raw_events.append(event_str)
 
@@ -798,7 +807,7 @@ async def test_regen_succeeds_on_second_attempt(mock_get_model, mock_search):
         protocol_id="proto-1",
         section_id="sec-1",
         section_name="Purpose",
-        original_prompt="Write it",
+        current_content="Existing content.",
     ):
         raw_events.append(event_str)
 
@@ -839,6 +848,6 @@ async def test_regen_vector_store_error_during_stream_not_retried(
             protocol_id="proto-1",
             section_id="sec-1",
             section_name="Purpose",
-            original_prompt="Write it",
+            current_content="Existing content.",
         ):
             pass

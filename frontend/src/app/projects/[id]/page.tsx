@@ -83,7 +83,7 @@ export default function DashboardPage() {
             project.protocolId,
             section.id,
             section.name,
-            section.originalPrompt,
+            section.content,
             guidance || null,
             controller.signal,
           )) {
