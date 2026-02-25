@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from src.services.section_graph import stream_sections_parallel
+from src.services.section_graph import stream_section_regenerate, stream_sections_parallel
 
 router = APIRouter()
 
@@ -15,6 +15,14 @@ class SectionRequest(BaseModel):
 class GenerateSectionsRequest(BaseModel):
     protocolId: str
     sections: list[SectionRequest]
+
+
+class RegenerateSectionRequest(BaseModel):
+    protocolId: str
+    sectionId: str
+    sectionName: str
+    originalPrompt: str
+    guidance: str | None = None
 
 
 @router.post("/generate")
@@ -30,6 +38,35 @@ async def generate_sections_endpoint(request: GenerateSectionsRequest):
         sections_input = [{"id": s.id, "name": s.name} for s in request.sections]
         async for event_str in stream_sections_parallel(
             request.protocolId, sections_input
+        ):
+            yield event_str
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.post("/regenerate")
+async def regenerate_section_endpoint(request: RegenerateSectionRequest):
+    """Stream section regeneration results as Server-Sent Events."""
+    if not request.protocolId.strip():
+        return _validation_error("protocolId is required")
+
+    if not request.sectionName.strip():
+        return _validation_error("sectionName is required")
+
+    async def event_generator():
+        async for event_str in stream_section_regenerate(
+            protocol_id=request.protocolId,
+            section_id=request.sectionId,
+            section_name=request.sectionName,
+            original_prompt=request.originalPrompt,
+            guidance=request.guidance,
         ):
             yield event_str
 
