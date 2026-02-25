@@ -26,12 +26,14 @@ function wordCount(text: string): number {
 
 interface SectionCardProps {
   section: SectionState;
+  onApprove?: () => void;
 }
 
-export function SectionCard({ section }: SectionCardProps) {
+export function SectionCard({ section, onApprove }: SectionCardProps) {
   const titleId = `section-title-${section.id}`;
   const isGenerating = section.status === "generating";
   const isError = section.status === "error";
+  const isApproved = section.status === "approved";
   const actionsDisabled = isGenerating || isError;
   const words = wordCount(section.content);
 
@@ -49,27 +51,30 @@ export function SectionCard({ section }: SectionCardProps) {
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            disabled={actionsDisabled}
-            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Approve ${section.name}`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="h-4 w-4"
+          {!isApproved && (
+            <button
+              disabled={actionsDisabled}
+              onClick={onApprove}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={`Approve ${section.name}`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.5 12.75l6 6 9-13.5"
-              />
-            </svg>
-            Approve
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.5 12.75l6 6 9-13.5"
+                />
+              </svg>
+              Approve
+            </button>
+          )}
           <button
             disabled={actionsDisabled}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"

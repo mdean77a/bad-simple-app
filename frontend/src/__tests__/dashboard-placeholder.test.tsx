@@ -227,6 +227,28 @@ describe("Dashboard Page", () => {
     });
   });
 
+  it("clicking Approve on a ready section changes it to approved", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    const approveBtn = await screen.findByRole("button", {
+      name: /approve study procedures/i,
+    });
+    await userEvent.click(approveBtn);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Approved")).toBeInTheDocument();
+    });
+    // Approve button should be gone after approval
+    expect(
+      screen.queryByRole("button", { name: /approve study procedures/i })
+    ).not.toBeInTheDocument();
+  });
+
   it("wraps sections in a main element", async () => {
     localStorage.setItem(
       "user",

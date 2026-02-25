@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import type { SectionState } from "@/types/project";
 
@@ -114,6 +115,36 @@ describe("SectionCard", () => {
     expect(approveBtn).toBeDisabled();
     expect(editBtn).toBeDisabled();
     expect(regenBtn).toBeDisabled();
+  });
+
+  it("hides Approve button when approved", () => {
+    render(<SectionCard section={approvedSection} />);
+
+    expect(
+      screen.queryByRole("button", { name: /approve risks/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit risks/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /regenerate risks/i })
+    ).toBeInTheDocument();
+  });
+
+  it("shows Approve button when ready", () => {
+    render(<SectionCard section={readySection} />);
+    expect(
+      screen.getByRole("button", { name: /approve purpose/i })
+    ).toBeInTheDocument();
+  });
+
+  it("calls onApprove when Approve button is clicked", async () => {
+    const onApprove = jest.fn();
+    render(<SectionCard section={readySection} onApprove={onApprove} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /approve purpose/i })
+    );
+
+    expect(onApprove).toHaveBeenCalledTimes(1);
   });
 
   it("disables all action buttons when error", () => {

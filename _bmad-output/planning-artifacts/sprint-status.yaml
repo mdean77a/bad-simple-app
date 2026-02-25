@@ -71,13 +71,13 @@ development_status:
   4-1-implement-section-generation-streaming-endpoint: done
   4-2-build-section-dashboard-layout: done
   4-3-implement-section-card-with-streaming-display: done
-  4-4-implement-error-handling-and-retry: in-progress
+  4-4-implement-error-handling-and-retry: done
   4-5-handle-outline-modifications: dropped  # deemed unnecessary
   epic-4-retrospective: optional
 
   # Epic 5: Section Review Workflow
   epic-5: backlog
-  5-1-implement-section-approve-action: backlog
+  5-1-implement-section-approve-action: in-progress
   5-2-implement-inline-section-editing: backlog
   5-3-implement-section-regeneration-endpoint: backlog
   5-4-build-regenerate-modal-with-guidance-input: backlog
