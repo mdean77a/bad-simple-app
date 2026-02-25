@@ -289,11 +289,11 @@ def test_list_protocols_returns_protocol_list(mock_settings, mock_client_cls):
 
     mock_client.scroll.side_effect = [
         (
-            [_make_point({"protocol_name": "Diabetes Study", "indexed_at": "2026-02-03T14:30:00+00:00"})],
+            [_make_point({"metadata": {"protocol_name": "Diabetes Study", "acronym": "DBS", "indexed_at": "2026-02-03T14:30:00+00:00"}})],
             None,
         ),
         (
-            [_make_point({"protocol_name": "Cardiac Trial", "indexed_at": "2026-02-01T10:00:00+00:00"})],
+            [_make_point({"metadata": {"protocol_name": "Cardiac Trial", "acronym": "CRT", "indexed_at": "2026-02-01T10:00:00+00:00"}})],
             None,
         ),
     ]
@@ -303,9 +303,11 @@ def test_list_protocols_returns_protocol_list(mock_settings, mock_client_cls):
     assert len(result) == 2
     assert result[0]["protocolId"] == "protocol_diabetes_20260203"
     assert result[0]["protocolName"] == "Diabetes Study"
+    assert result[0]["acronym"] == "DBS"
     assert result[0]["indexedAt"] == "2026-02-03T14:30:00+00:00"
     assert result[1]["protocolId"] == "protocol_cardiac_20260201"
     assert result[1]["protocolName"] == "Cardiac Trial"
+    assert result[1]["acronym"] == "CRT"
 
 
 @patch("src.services.vector_store.QdrantClient")
@@ -344,9 +346,9 @@ def test_list_protocols_sorted_by_indexed_at_descending(mock_settings, mock_clie
     mock_client.get_collections.return_value = collections_response
 
     mock_client.scroll.side_effect = [
-        ([_make_point({"protocol_name": "Older", "indexed_at": "2026-01-01T00:00:00+00:00"})], None),
-        ([_make_point({"protocol_name": "Newer", "indexed_at": "2026-03-01T00:00:00+00:00"})], None),
-        ([_make_point({"protocol_name": "Middle", "indexed_at": "2026-02-01T00:00:00+00:00"})], None),
+        ([_make_point({"metadata": {"protocol_name": "Older", "acronym": "OLD", "indexed_at": "2026-01-01T00:00:00+00:00"}})], None),
+        ([_make_point({"metadata": {"protocol_name": "Newer", "acronym": "NEW", "indexed_at": "2026-03-01T00:00:00+00:00"}})], None),
+        ([_make_point({"metadata": {"protocol_name": "Middle", "acronym": "MID", "indexed_at": "2026-02-01T00:00:00+00:00"}})], None),
     ]
 
     result = list_protocols()
@@ -394,7 +396,7 @@ def test_list_protocols_skips_empty_collections(mock_settings, mock_client_cls):
     mock_client.get_collections.return_value = collections_response
 
     mock_client.scroll.side_effect = [
-        ([_make_point({"protocol_name": "Has Points", "indexed_at": "2026-02-01T00:00:00+00:00"})], None),
+        ([_make_point({"metadata": {"protocol_name": "Has Points", "acronym": "HPT", "indexed_at": "2026-02-01T00:00:00+00:00"}})], None),
         ([], None),  # empty collection
     ]
 

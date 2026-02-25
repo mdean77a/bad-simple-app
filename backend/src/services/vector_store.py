@@ -107,7 +107,7 @@ def search_protocol(collection_name: str, query: str, k: int = 20) -> list[str]:
 def list_protocols() -> list[dict]:
     """List all indexed protocols from Qdrant.
 
-    Returns list of {protocolId, protocolName, indexedAt} sorted by indexedAt desc.
+    Returns list of {protocolId, protocolName, acronym, indexedAt} sorted by indexedAt desc.
     """
     if not settings.qdrant_url:
         raise VectorStoreError("QDRANT_URL is not configured")
@@ -123,11 +123,13 @@ def list_protocols() -> list[dict]:
             points, _ = client.scroll(collection.name, limit=1)
             if not points:
                 continue
-            metadata = points[0].payload or {}
+            payload = points[0].payload or {}
+            metadata = payload.get("metadata", payload)
             protocols.append(
                 {
                     "protocolId": collection.name,
                     "protocolName": metadata.get("protocol_name", collection.name),
+                    "acronym": metadata.get("acronym", ""),
                     "indexedAt": metadata.get("indexed_at", ""),
                 }
             )

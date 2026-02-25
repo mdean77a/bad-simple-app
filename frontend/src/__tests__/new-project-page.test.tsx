@@ -214,14 +214,18 @@ describe("New Project Page", () => {
       {
         protocolId: "protocol_diabetes_20260203",
         protocolName: "Diabetes Study",
+        acronym: "DBS",
         indexedAt: "2026-02-03T14:30:00+00:00",
       },
     ]);
 
     renderPage();
 
-    const select = await screen.findByLabelText("Select a protocol");
-    await userEvent.selectOptions(select, "protocol_diabetes_20260203");
+    // Open custom dropdown and click the protocol option
+    const trigger = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(trigger);
+    const option = screen.getByRole("option");
+    fireEvent.click(option);
 
     const continueBtn = screen.getByRole("button", { name: /continue/i });
     expect(continueBtn).toBeEnabled();
