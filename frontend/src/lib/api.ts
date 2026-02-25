@@ -30,6 +30,7 @@ export interface UploadResult {
 export interface Protocol {
   protocolId: string;
   protocolName: string;
+  acronym: string;
   indexedAt: string;
 }
 

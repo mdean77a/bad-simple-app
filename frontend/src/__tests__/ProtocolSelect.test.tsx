@@ -1,5 +1,4 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { ProtocolSelect } from "@/components/projects/ProtocolSelect";
 import * as api from "@/lib/api";
 
@@ -18,11 +17,13 @@ const mockProtocols: api.Protocol[] = [
   {
     protocolId: "protocol_diabetes_20260203",
     protocolName: "Diabetes Study",
+    acronym: "DBS",
     indexedAt: "2026-02-03T14:30:00+00:00",
   },
   {
     protocolId: "protocol_cardiac_20260201",
     protocolName: "Cardiac Trial",
+    acronym: "CRT",
     indexedAt: "2026-02-01T10:00:00+00:00",
   },
 ];
@@ -40,43 +41,64 @@ describe("ProtocolSelect", () => {
     expect(screen.getByLabelText("Loading protocols")).toBeInTheDocument();
   });
 
-  it("shows dropdown with protocols after loading", async () => {
+  it("shows trigger button with placeholder after loading", async () => {
     mockFetchProtocols.mockResolvedValue(mockProtocols);
 
     render(<ProtocolSelect />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    expect(select).toBeInTheDocument();
-    expect(select.tagName).toBe("SELECT");
-
-    const options = select.querySelectorAll("option");
-    expect(options).toHaveLength(3);
-    expect(options[0]).toHaveTextContent("Select a protocol...");
-    expect(options[1]).toHaveTextContent("Diabetes Study");
-    expect(options[2]).toHaveTextContent("Cardiac Trial");
+    const button = await screen.findByLabelText("Select a protocol");
+    expect(button).toBeInTheDocument();
+    expect(button.tagName).toBe("BUTTON");
+    expect(button).toHaveTextContent("Select a protocol...");
   });
 
-  it("shows indexed date in each option", async () => {
+  it("opens dropdown and shows protocols with acronym, name, and date", async () => {
     mockFetchProtocols.mockResolvedValue(mockProtocols);
 
     render(<ProtocolSelect />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    const options = select.querySelectorAll("option");
-    expect(options[1].textContent).toMatch(/Indexed/);
-    expect(options[2].textContent).toMatch(/Indexed/);
+    const button = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(button);
+
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveTextContent("DBS");
+    expect(options[0]).toHaveTextContent("Diabetes Study");
+    expect(options[1]).toHaveTextContent("CRT");
+    expect(options[1]).toHaveTextContent("Cardiac Trial");
   });
 
-  it("shows disabled dropdown with 'No protocols uploaded yet' when empty", async () => {
+  it("shows absolute date in dropdown items", async () => {
+    mockFetchProtocols.mockResolvedValue([
+      {
+        protocolId: "test",
+        protocolName: "Test Protocol",
+        acronym: "TST",
+        indexedAt: "2026-02-24T18:06:00+00:00",
+      },
+    ]);
+
+    render(<ProtocolSelect />);
+
+    const button = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(button);
+
+    const option = screen.getByRole("option");
+    // Should contain absolute date parts (month, day, year, time)
+    expect(option.textContent).toMatch(/Feb/);
+    expect(option.textContent).toMatch(/24/);
+    expect(option.textContent).toMatch(/2026/);
+    expect(option.textContent).toMatch(/at/);
+  });
+
+  it("shows disabled button with 'No protocols uploaded yet' when empty", async () => {
     mockFetchProtocols.mockResolvedValue([]);
 
     render(<ProtocolSelect />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    expect(select).toBeDisabled();
-
-    const placeholder = select.querySelector("option");
-    expect(placeholder).toHaveTextContent("No protocols uploaded yet");
+    const button = await screen.findByLabelText("Select a protocol");
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("No protocols uploaded yet");
   });
 
   it("shows error state on fetch failure", async () => {
@@ -107,74 +129,73 @@ describe("ProtocolSelect", () => {
     expect(mockFetchProtocols).toHaveBeenCalledTimes(2);
   });
 
-  it("calls onSelectionChange when selection changes", async () => {
+  it("calls onSelectionChange when an item is selected", async () => {
     mockFetchProtocols.mockResolvedValue(mockProtocols);
     const onSelectionChange = jest.fn();
 
     render(<ProtocolSelect onSelectionChange={onSelectionChange} />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    await userEvent.selectOptions(select, "protocol_diabetes_20260203");
+    const button = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(button);
 
-    expect(onSelectionChange).toHaveBeenCalledWith("protocol_diabetes_20260203");
+    const options = screen.getAllByRole("option");
+    fireEvent.click(options[0]);
 
-    await userEvent.selectOptions(select, "");
-    expect(onSelectionChange).toHaveBeenCalledWith(null);
+    expect(onSelectionChange).toHaveBeenCalledWith(
+      "protocol_diabetes_20260203"
+    );
   });
 
-  it("disables dropdown when disabled prop is true", async () => {
+  it("shows selected protocol acronym and name in trigger button", async () => {
+    mockFetchProtocols.mockResolvedValue(mockProtocols);
+
+    render(<ProtocolSelect />);
+
+    const button = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(button);
+
+    const options = screen.getAllByRole("option");
+    fireEvent.click(options[0]);
+
+    expect(button).toHaveTextContent("DBS");
+    expect(button).toHaveTextContent("Diabetes Study");
+  });
+
+  it("disables button when disabled prop is true", async () => {
     mockFetchProtocols.mockResolvedValue(mockProtocols);
 
     render(<ProtocolSelect disabled />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    expect(select).toBeDisabled();
+    const button = await screen.findByLabelText("Select a protocol");
+    expect(button).toBeDisabled();
   });
 
-  it("formats today's date as 'today'", async () => {
-    const now = new Date().toISOString();
-    mockFetchProtocols.mockResolvedValue([
-      { protocolId: "test", protocolName: "Today Protocol", indexedAt: now },
-    ]);
+  it("closes dropdown on outside click", async () => {
+    mockFetchProtocols.mockResolvedValue(mockProtocols);
 
     render(<ProtocolSelect />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    const option = select.querySelectorAll("option")[1];
-    expect(option.textContent).toContain("Indexed today");
+    const button = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(button);
+
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("formats a date 3 days ago as '3 days ago'", async () => {
-    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
-    mockFetchProtocols.mockResolvedValue([
-      {
-        protocolId: "test",
-        protocolName: "Recent Protocol",
-        indexedAt: threeDaysAgo,
-      },
-    ]);
+  it("closes dropdown after selection", async () => {
+    mockFetchProtocols.mockResolvedValue(mockProtocols);
 
     render(<ProtocolSelect />);
 
-    const select = await screen.findByLabelText("Select a protocol");
-    const option = select.querySelectorAll("option")[1];
-    expect(option.textContent).toContain("Indexed 3 days ago");
-  });
+    const button = await screen.findByLabelText("Select a protocol");
+    fireEvent.click(button);
 
-  it("formats yesterday's date as 'yesterday'", async () => {
-    const yesterday = new Date(Date.now() - 86400000).toISOString();
-    mockFetchProtocols.mockResolvedValue([
-      {
-        protocolId: "test",
-        protocolName: "Yesterday Protocol",
-        indexedAt: yesterday,
-      },
-    ]);
+    const options = screen.getAllByRole("option");
+    fireEvent.click(options[1]);
 
-    render(<ProtocolSelect />);
-
-    const select = await screen.findByLabelText("Select a protocol");
-    const option = select.querySelectorAll("option")[1];
-    expect(option.textContent).toContain("Indexed yesterday");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });
