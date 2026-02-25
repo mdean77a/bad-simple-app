@@ -50,5 +50,8 @@ Thumbs.db
 *.swp
 *.swo
 
+# Prototyping scripts
+prototype.py
+
 # BMAD persistent memory (session-specific)
 _bmad/_memory/

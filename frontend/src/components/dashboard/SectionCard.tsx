@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { SectionState, SectionStatus } from "@/types/project";
 import { StatusIcon } from "@/components/common/StatusIcon";
 
@@ -27,15 +30,38 @@ function wordCount(text: string): number {
 interface SectionCardProps {
   section: SectionState;
   onApprove?: () => void;
+  onEdit?: () => void;
+  onSave?: (content: string) => void;
+  onCancel?: () => void;
 }
 
-export function SectionCard({ section, onApprove }: SectionCardProps) {
+export function SectionCard({ section, onApprove, onEdit, onSave, onCancel }: SectionCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
+
   const titleId = `section-title-${section.id}`;
   const isGenerating = section.status === "generating";
   const isError = section.status === "error";
   const isApproved = section.status === "approved";
   const actionsDisabled = isGenerating || isError;
-  const words = wordCount(section.content);
+  const words = isEditing ? wordCount(editContent) : wordCount(section.content);
+
+  const handleEditClick = () => {
+    setEditContent(section.content);
+    setIsEditing(true);
+    onEdit?.();
+  };
+
+  const handleSave = () => {
+    onSave?.(editContent);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditContent("");
+    onCancel?.();
+  };
 
   return (
     <article
@@ -51,72 +77,96 @@ export function SectionCard({ section, onApprove }: SectionCardProps) {
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          {!isApproved && (
-            <button
-              disabled={actionsDisabled}
-              onClick={onApprove}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label={`Approve ${section.name}`}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="h-4 w-4"
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                aria-label={`Save ${section.name}`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4.5 12.75l6 6 9-13.5"
-                />
-              </svg>
-              Approve
-            </button>
+                Save
+              </button>
+              <button
+                onClick={handleCancel}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                aria-label={`Cancel editing ${section.name}`}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {!isApproved && (
+                <button
+                  disabled={actionsDisabled}
+                  onClick={onApprove}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={`Approve ${section.name}`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                  Approve
+                </button>
+              )}
+              {section.status !== "editing" && (
+                <button
+                  disabled={actionsDisabled}
+                  onClick={handleEditClick}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={`Edit ${section.name}`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z"
+                    />
+                  </svg>
+                  Edit
+                </button>
+              )}
+              <button
+                disabled={actionsDisabled}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`Regenerate ${section.name}`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"
+                  />
+                </svg>
+                Regenerate
+              </button>
+            </>
           )}
-          <button
-            disabled={actionsDisabled}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Edit ${section.name}`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="h-4 w-4"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z"
-              />
-            </svg>
-            Edit
-          </button>
-          <button
-            disabled={actionsDisabled}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Regenerate ${section.name}`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="h-4 w-4"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"
-              />
-            </svg>
-            Regenerate
-          </button>
         </div>
       </div>
 
@@ -129,7 +179,15 @@ export function SectionCard({ section, onApprove }: SectionCardProps) {
       <div
         className={`mt-4 max-h-96 overflow-y-auto rounded-md border-l-4 bg-slate-50 p-4 ${borderColors[section.status]}`}
       >
-        {isGenerating && !section.content ? (
+        {isEditing ? (
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full resize-y rounded border border-slate-300 bg-white p-3 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            rows={10}
+            aria-label={`Edit content for ${section.name}`}
+          />
+        ) : isGenerating && !section.content ? (
           <div className="space-y-3" data-testid="section-skeleton">
             <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200" />
             <div className="h-4 w-full animate-pulse rounded bg-slate-200" />

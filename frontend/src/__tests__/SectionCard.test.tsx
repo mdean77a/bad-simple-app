@@ -43,6 +43,22 @@ const generatingWithContent: SectionState = {
   originalPrompt: "",
 };
 
+const editedSection: SectionState = {
+  id: "sec-6",
+  name: "Edited Section",
+  content: "Previously edited content here.",
+  status: "edited",
+  originalPrompt: "",
+};
+
+const editingSection: SectionState = {
+  id: "sec-7",
+  name: "Currently Editing",
+  content: "Content being edited.",
+  status: "editing",
+  originalPrompt: "",
+};
+
 describe("SectionCard", () => {
   it("renders section name as heading", () => {
     render(<SectionCard section={readySection} />);
@@ -221,5 +237,149 @@ describe("SectionCard", () => {
     expect(content).toHaveClass("text-red-700");
     expect(content).toHaveClass("font-medium");
     expect(content).not.toHaveClass("text-slate-700");
+  });
+
+  // --- Inline editing tests ---
+
+  it("calls onEdit and shows textarea when Edit button is clicked", async () => {
+    const onEdit = jest.fn();
+    render(<SectionCard section={readySection} onEdit={onEdit} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit purpose/i })
+    );
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("textbox", { name: /edit content for purpose/i })
+    ).toBeInTheDocument();
+  });
+
+  it("populates textarea with section content when editing", async () => {
+    render(<SectionCard section={readySection} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit purpose/i })
+    );
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for purpose/i,
+    });
+    expect(textarea).toHaveValue(readySection.content);
+  });
+
+  it("shows Save and Cancel buttons when editing, hides Approve/Edit/Regenerate", async () => {
+    render(<SectionCard section={readySection} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit purpose/i })
+    );
+
+    expect(
+      screen.getByRole("button", { name: /save purpose/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /cancel editing purpose/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /approve purpose/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /edit purpose/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /regenerate purpose/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls onSave with modified text when Save is clicked", async () => {
+    const onSave = jest.fn();
+    render(<SectionCard section={readySection} onSave={onSave} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit purpose/i })
+    );
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for purpose/i,
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "Updated content");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /save purpose/i })
+    );
+
+    expect(onSave).toHaveBeenCalledWith("Updated content");
+  });
+
+  it("calls onCancel and discards changes when Cancel is clicked", async () => {
+    const onCancel = jest.fn();
+    render(<SectionCard section={readySection} onCancel={onCancel} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit purpose/i })
+    );
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for purpose/i,
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "Some changes");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /cancel editing purpose/i })
+    );
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    // Should exit editing mode and show original content
+    expect(
+      screen.queryByRole("textbox")
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(readySection.content)).toBeInTheDocument();
+  });
+
+  it("updates word count while editing", async () => {
+    render(<SectionCard section={readySection} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit purpose/i })
+    );
+
+    const textarea = screen.getByRole("textbox", {
+      name: /edit content for purpose/i,
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "One two three");
+
+    expect(screen.getByText(/3 words/)).toBeInTheDocument();
+  });
+
+  it("Edit button is enabled for ready status", () => {
+    render(<SectionCard section={readySection} />);
+    expect(
+      screen.getByRole("button", { name: /edit purpose/i })
+    ).toBeEnabled();
+  });
+
+  it("Edit button is enabled for edited status", () => {
+    render(<SectionCard section={editedSection} />);
+    expect(
+      screen.getByRole("button", { name: /edit edited section/i })
+    ).toBeEnabled();
+  });
+
+  it("Edit button is enabled for approved status", () => {
+    render(<SectionCard section={approvedSection} />);
+    expect(
+      screen.getByRole("button", { name: /edit risks/i })
+    ).toBeEnabled();
+  });
+
+  it("hides Edit button when status is editing", () => {
+    render(<SectionCard section={editingSection} />);
+    expect(
+      screen.queryByRole("button", { name: /edit currently editing/i })
+    ).not.toBeInTheDocument();
   });
 });
