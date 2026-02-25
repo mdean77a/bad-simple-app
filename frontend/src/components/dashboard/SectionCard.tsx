@@ -31,6 +31,8 @@ interface SectionCardProps {
 export function SectionCard({ section }: SectionCardProps) {
   const titleId = `section-title-${section.id}`;
   const isGenerating = section.status === "generating";
+  const isError = section.status === "error";
+  const actionsDisabled = isGenerating || isError;
   const words = wordCount(section.content);
 
   return (
@@ -48,7 +50,7 @@ export function SectionCard({ section }: SectionCardProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            disabled={isGenerating}
+            disabled={actionsDisabled}
             className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={`Approve ${section.name}`}
           >
@@ -69,7 +71,7 @@ export function SectionCard({ section }: SectionCardProps) {
             Approve
           </button>
           <button
-            disabled={isGenerating}
+            disabled={actionsDisabled}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={`Edit ${section.name}`}
           >
@@ -90,7 +92,7 @@ export function SectionCard({ section }: SectionCardProps) {
             Edit
           </button>
           <button
-            disabled={isGenerating}
+            disabled={actionsDisabled}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={`Regenerate ${section.name}`}
           >

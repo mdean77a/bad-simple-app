@@ -116,6 +116,20 @@ describe("SectionCard", () => {
     expect(regenBtn).toBeDisabled();
   });
 
+  it("disables all action buttons when error", () => {
+    render(<SectionCard section={errorSection} />);
+
+    expect(
+      screen.getByRole("button", { name: /approve contact/i })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /edit contact/i })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /regenerate contact/i })
+    ).toBeDisabled();
+  });
+
   it("enables all action buttons when ready", () => {
     render(<SectionCard section={readySection} />);
 
