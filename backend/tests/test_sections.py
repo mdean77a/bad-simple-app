@@ -1,11 +1,7 @@
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
-
-from src.services.llm_factory import LLMConfigError
-from src.services.section_generator import SectionGenerationError
-from src.services.vector_store import VectorStoreError
 
 
 def _parse_sse(text: str) -> list[dict]:
@@ -24,24 +20,29 @@ def _parse_sse(text: str) -> list[dict]:
     return events
 
 
-async def _fake_stream(*chunks):
-    """Create an async generator that yields the given chunks."""
-    for chunk in chunks:
-        yield chunk
+def _sse_event(event: str, data: dict) -> str:
+    """Format a single SSE event (mirrors section_graph._sse_event)."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 # --- POST /api/v1/sections/generate ---
 
 
 @pytest.mark.asyncio
-@patch("src.api.routes.sections.generate_section_stream")
-async def test_generate_sections_success(mock_gen, client):
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_sections_success(mock_stream, client):
     """Successful generation emits section_start, section_chunk(s), section_complete."""
-    async def fake_stream(protocol_id, section_name):
-        yield "This study "
-        yield "investigates..."
 
-    mock_gen.side_effect = fake_stream
+    async def fake_stream(protocol_id, sections):
+        s = sections[0]
+        yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
+        yield _sse_event("section_chunk", {"sectionId": s["id"], "content": "This study "})
+        yield _sse_event(
+            "section_chunk", {"sectionId": s["id"], "content": "investigates..."}
+        )
+        yield _sse_event("section_complete", {"sectionId": s["id"], "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
 
     response = await client.post(
         "/api/v1/sections/generate",
@@ -72,13 +73,24 @@ async def test_generate_sections_success(mock_gen, client):
 
 
 @pytest.mark.asyncio
-@patch("src.api.routes.sections.generate_section_stream")
-async def test_generate_sections_multiple_sections(mock_gen, client):
-    """Multiple sections are processed sequentially."""
-    async def fake_stream(protocol_id, section_name):
-        yield f"Content for {section_name}"
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_sections_multiple_sections(mock_stream, client):
+    """Multiple sections produce events for all sections."""
 
-    mock_gen.side_effect = fake_stream
+    async def fake_stream(protocol_id, sections):
+        for s in sections:
+            yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
+        for s in sections:
+            yield _sse_event(
+                "section_chunk",
+                {"sectionId": s["id"], "content": f"Content for {s['name']}"},
+            )
+        for s in sections:
+            yield _sse_event(
+                "section_complete", {"sectionId": s["id"], "status": "ready"}
+            )
+
+    mock_stream.side_effect = fake_stream
 
     response = await client.post(
         "/api/v1/sections/generate",
@@ -96,22 +108,27 @@ async def test_generate_sections_multiple_sections(mock_gen, client):
 
     start_events = [e for e in events if e["event"] == "section_start"]
     assert len(start_events) == 2
-    assert start_events[0]["data"]["sectionId"] == "sec-1"
-    assert start_events[1]["data"]["sectionId"] == "sec-2"
+    start_ids = {e["data"]["sectionId"] for e in start_events}
+    assert start_ids == {"sec-1", "sec-2"}
 
     complete_events = [e for e in events if e["event"] == "section_complete"]
     assert len(complete_events) == 2
 
 
 @pytest.mark.asyncio
-@patch("src.api.routes.sections.generate_section_stream")
-async def test_generate_sections_vector_store_error(mock_gen, client):
-    """VectorStoreError emits section_error event."""
-    async def failing_stream(protocol_id, section_name):
-        raise VectorStoreError("Connection refused")
-        yield  # make it an async generator  # pragma: no cover
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_sections_error_event(mock_stream, client):
+    """Error from streaming yields section_error event."""
 
-    mock_gen.side_effect = failing_stream
+    async def fake_stream(protocol_id, sections):
+        s = sections[0]
+        yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
+        yield _sse_event(
+            "section_error",
+            {"sectionId": s["id"], "status": "error", "message": "Connection refused"},
+        )
+
+    mock_stream.side_effect = fake_stream
 
     response = await client.post(
         "/api/v1/sections/generate",
@@ -132,14 +149,23 @@ async def test_generate_sections_vector_store_error(mock_gen, client):
 
 
 @pytest.mark.asyncio
-@patch("src.api.routes.sections.generate_section_stream")
-async def test_generate_sections_llm_config_error(mock_gen, client):
-    """LLMConfigError emits section_error event."""
-    async def failing_stream(protocol_id, section_name):
-        raise LLMConfigError("ANTHROPIC_API_KEY is not configured")
-        yield  # pragma: no cover
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_sections_llm_config_error(mock_stream, client):
+    """LLMConfigError yields section_error for all sections."""
 
-    mock_gen.side_effect = failing_stream
+    async def fake_stream(protocol_id, sections):
+        for s in sections:
+            yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
+            yield _sse_event(
+                "section_error",
+                {
+                    "sectionId": s["id"],
+                    "status": "error",
+                    "message": "ANTHROPIC_API_KEY is not configured",
+                },
+            )
+
+    mock_stream.side_effect = fake_stream
 
     response = await client.post(
         "/api/v1/sections/generate",
@@ -155,32 +181,6 @@ async def test_generate_sections_llm_config_error(mock_gen, client):
     error_events = [e for e in events if e["event"] == "section_error"]
     assert len(error_events) == 1
     assert "ANTHROPIC_API_KEY" in error_events[0]["data"]["message"]
-
-
-@pytest.mark.asyncio
-@patch("src.api.routes.sections.generate_section_stream")
-async def test_generate_sections_generation_error(mock_gen, client):
-    """SectionGenerationError emits section_error event."""
-    async def failing_stream(protocol_id, section_name):
-        raise SectionGenerationError("Failed after 3 attempts")
-        yield  # pragma: no cover
-
-    mock_gen.side_effect = failing_stream
-
-    response = await client.post(
-        "/api/v1/sections/generate",
-        json={
-            "protocolId": "protocol_test_123",
-            "sections": [{"id": "sec-1", "name": "Purpose"}],
-        },
-    )
-
-    assert response.status_code == 200
-    events = _parse_sse(response.text)
-
-    error_events = [e for e in events if e["event"] == "section_error"]
-    assert len(error_events) == 1
-    assert "Failed after 3 attempts" in error_events[0]["data"]["message"]
 
 
 @pytest.mark.asyncio
@@ -240,13 +240,17 @@ async def test_generate_sections_missing_sections_field(client):
 
 
 @pytest.mark.asyncio
-@patch("src.api.routes.sections.generate_section_stream")
-async def test_generate_sections_sse_event_format(mock_gen, client):
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_sections_sse_event_format(mock_stream, client):
     """SSE events have correct format with event: and data: lines."""
-    async def fake_stream(protocol_id, section_name):
-        yield "chunk"
 
-    mock_gen.side_effect = fake_stream
+    async def fake_stream(protocol_id, sections):
+        s = sections[0]
+        yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
+        yield _sse_event("section_chunk", {"sectionId": s["id"], "content": "chunk"})
+        yield _sse_event("section_complete", {"sectionId": s["id"], "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
 
     response = await client.post(
         "/api/v1/sections/generate",
@@ -257,9 +261,7 @@ async def test_generate_sections_sse_event_format(mock_gen, client):
     )
 
     text = response.text
-    # Verify SSE format: event lines followed by data lines
     assert "event: section_start\n" in text
     assert "event: section_chunk\n" in text
     assert "event: section_complete\n" in text
-    # Each event block ends with double newline
     assert "\n\n" in text

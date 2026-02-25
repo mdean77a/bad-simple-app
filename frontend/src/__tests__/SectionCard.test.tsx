@@ -29,7 +29,7 @@ const approvedSection: SectionState = {
 const errorSection: SectionState = {
   id: "sec-4",
   name: "Contact Information",
-  content: "",
+  content: "Generation failed: LLM timeout",
   status: "error",
   originalPrompt: "",
 };
@@ -161,5 +161,20 @@ describe("SectionCard", () => {
     expect(screen.getByText("Approve")).toBeInTheDocument();
     expect(screen.getByText("Edit")).toBeInTheDocument();
     expect(screen.getByText("Regenerate")).toBeInTheDocument();
+  });
+
+  it("applies scrollable classes to content area", () => {
+    const { container } = render(<SectionCard section={readySection} />);
+    const contentArea = container.querySelector(".max-h-96.overflow-y-auto");
+    expect(contentArea).toBeInTheDocument();
+  });
+
+  it("applies error text styling when status is error", () => {
+    render(<SectionCard section={errorSection} />);
+
+    const content = screen.getByText("Generation failed: LLM timeout");
+    expect(content).toHaveClass("text-red-700");
+    expect(content).toHaveClass("font-medium");
+    expect(content).not.toHaveClass("text-slate-700");
   });
 });

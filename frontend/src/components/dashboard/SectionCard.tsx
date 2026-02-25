@@ -120,7 +120,7 @@ export function SectionCard({ section }: SectionCardProps) {
 
       {/* Content area */}
       <div
-        className={`mt-4 rounded-md border-l-4 bg-slate-50 p-4 ${borderColors[section.status]}`}
+        className={`mt-4 max-h-96 overflow-y-auto rounded-md border-l-4 bg-slate-50 p-4 ${borderColors[section.status]}`}
       >
         {isGenerating && !section.content ? (
           <div className="space-y-3" data-testid="section-skeleton">
@@ -130,7 +130,7 @@ export function SectionCard({ section }: SectionCardProps) {
             <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
           </div>
         ) : (
-          <p className="whitespace-pre-wrap text-sm text-slate-700">
+          <p className={`whitespace-pre-wrap text-sm ${section.status === "error" ? "font-medium text-red-700" : "text-slate-700"}`}>
             {section.content}
           </p>
         )}
