@@ -11,7 +11,19 @@ import { useSectionStreaming } from "@/hooks/useSectionStreaming";
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
-  const { project, unconfirmOutline } = useProject();
+  const { project, unconfirmOutline, updateSection } = useProject();
+
+  const handleApprove = (sectionId: string) => {
+    if (!user) return;
+    updateSection(sectionId, {
+      status: "approved",
+      approval: {
+        userName: user.name,
+        userEmail: user.email,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  };
   useSectionStreaming();
   const router = useRouter();
   const params = useParams();
@@ -50,7 +62,11 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-6">
               {project.sections.map((section) => (
-                <SectionCard key={section.id} section={section} />
+                <SectionCard
+                  key={section.id}
+                  section={section}
+                  onApprove={() => handleApprove(section.id)}
+                />
               ))}
             </div>
           )}

@@ -179,6 +179,87 @@ async def test_section_node_llm_config_error(mock_search):
     assert "Key missing" in result["results"]["sec-1"]["error"]
 
 
+# --- stream_sections_parallel (chunk streaming) ---
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.build_section_graph")
+@patch("src.services.section_graph.get_chat_model")
+async def test_stream_emits_chunk_events(mock_get_model, mock_build_graph):
+    """on_chat_model_stream events from astream_events produce section_chunk SSE events."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_get_model.return_value = MagicMock()
+
+    async def fake_astream_events(input, version):
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "Purpose"},
+            "data": {"chunk": AIMessageChunk(content="Hello ")},
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "Purpose"},
+            "data": {"chunk": AIMessageChunk(content="world")},
+        }
+
+    mock_graph = MagicMock()
+    mock_graph.astream_events = fake_astream_events
+
+    def build_side_effect(protocol_id, sections, model, node_results):
+        node_results["sec-1"] = {"content": "Hello world", "status": "ready", "error": None}
+        return mock_graph
+
+    mock_build_graph.side_effect = build_side_effect
+
+    sections = [{"id": "sec-1", "name": "Purpose"}]
+    raw_events = []
+    async for event_str in stream_sections_parallel("proto-1", sections):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    chunk_events = [e for e in events if e["event"] == "section_chunk"]
+    assert len(chunk_events) == 2
+    assert chunk_events[0]["data"]["sectionId"] == "sec-1"
+    assert chunk_events[0]["data"]["content"] == "Hello "
+    assert chunk_events[1]["data"]["content"] == "world"
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.build_section_graph")
+@patch("src.services.section_graph.get_chat_model")
+async def test_stream_ignores_non_matching_node_names(mock_get_model, mock_build_graph):
+    """on_chat_model_stream events with unknown node names are ignored."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_get_model.return_value = MagicMock()
+
+    async def fake_astream_events(input, version):
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "UnknownSection"},
+            "data": {"chunk": AIMessageChunk(content="ignored")},
+        }
+
+    mock_graph = MagicMock()
+    mock_graph.astream_events = fake_astream_events
+
+    def build_side_effect(protocol_id, sections, model, node_results):
+        node_results["sec-1"] = {"content": "", "status": "error", "error": "Not found"}
+        return mock_graph
+
+    mock_build_graph.side_effect = build_side_effect
+
+    sections = [{"id": "sec-1", "name": "Purpose"}]
+    raw_events = []
+    async for event_str in stream_sections_parallel("proto-1", sections):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    chunk_events = [e for e in events if e["event"] == "section_chunk"]
+    assert len(chunk_events) == 0
+
+
 # --- stream_sections_parallel ---
 
 

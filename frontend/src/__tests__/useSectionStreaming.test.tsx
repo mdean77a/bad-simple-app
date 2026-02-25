@@ -190,6 +190,55 @@ describe("useSectionStreaming", () => {
     });
   });
 
+  it("does not call streamSections when protocolId is empty", async () => {
+    const sections = makeSections();
+
+    function EmptyProtocolHarness() {
+      const { project, confirmOutline } = useProject();
+      const [seeded, setSeeded] = React.useState(false);
+      React.useEffect(() => {
+        if (!seeded) {
+          confirmOutline("", mockOutline, sections);
+          setSeeded(true);
+        }
+      }, [seeded, confirmOutline]);
+      useSectionStreaming();
+      return <div data-testid="section-count">{project.sections.length}</div>;
+    }
+
+    render(
+      <ProjectProvider>
+        <EmptyProtocolHarness />
+      </ProjectProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("section-count")).toHaveTextContent("2");
+    });
+
+    expect(mockStreamSections).not.toHaveBeenCalled();
+  });
+
+  it("silently returns on AbortError without marking sections as error", async () => {
+    async function* abortStream(): AsyncGenerator<SSEEvent> {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    mockStreamSections.mockReturnValue(abortStream());
+
+    renderWithHarness(makeSections());
+
+    await waitFor(() => {
+      expect(mockStreamSections).toHaveBeenCalled();
+    });
+
+    // Small delay to let the async IIFE complete
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Sections should remain in generating state, not error
+    expect(screen.getByTestId("status-s1")).toHaveTextContent("generating");
+    expect(screen.getByTestId("status-s2")).toHaveTextContent("generating");
+  });
+
   it("aborts on unmount without error", async () => {
     let abortSignal: AbortSignal | undefined;
     async function* hangingStream(

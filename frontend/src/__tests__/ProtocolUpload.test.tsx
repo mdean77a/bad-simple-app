@@ -275,6 +275,28 @@ describe("ProtocolUpload", () => {
     ).toBeInTheDocument();
   });
 
+  it("calls onFileChange(false) when Try Again is clicked", async () => {
+    mockUploadProtocol.mockRejectedValue(
+      new api.ApiError("PDF_PARSE_ERROR", "Could not read PDF")
+    );
+
+    const onFileChange = jest.fn();
+    render(<ProtocolUpload onFileChange={onFileChange} />);
+
+    const dropZone = screen.getByLabelText("Upload protocol PDF");
+    const file = new File(["pdf"], "test.pdf", { type: "application/pdf" });
+    fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+
+    const acronymInput = screen.getByLabelText("Protocol Acronym");
+    await userEvent.type(acronymInput, "TESTT");
+    fireEvent.click(screen.getByRole("button", { name: /upload protocol/i }));
+
+    const tryAgainBtn = await screen.findByRole("button", { name: /try again/i });
+    fireEvent.click(tryAgainBtn);
+
+    expect(onFileChange).toHaveBeenCalledWith(false);
+  });
+
   it("uploads file when selected via file input", async () => {
     mockUploadProtocol.mockResolvedValue({
       protocolId: "test_456",
