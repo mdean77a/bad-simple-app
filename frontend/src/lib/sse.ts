@@ -6,23 +6,10 @@ export type SSEEvent =
   | { event: "section_complete"; sectionId: string; status: string }
   | { event: "section_error"; sectionId: string; message: string };
 
-export async function* streamSections(
-  protocolId: string,
-  sections: { id: string; name: string }[],
-  signal?: AbortSignal
+async function* readSSEStream(
+  response: Response,
 ): AsyncGenerator<SSEEvent> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/sections/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ protocolId, sections }),
-    signal,
-  });
-
-  if (!response.ok || !response.body) {
-    throw new Error(`Stream request failed: ${response.status} ${response.statusText}`);
-  }
-
-  const reader = response.body.getReader();
+  const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let currentEvent = "";
@@ -60,4 +47,45 @@ export async function* streamSections(
   } finally {
     reader.releaseLock();
   }
+}
+
+export async function* streamSections(
+  protocolId: string,
+  sections: { id: string; name: string }[],
+  signal?: AbortSignal
+): AsyncGenerator<SSEEvent> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/sections/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ protocolId, sections }),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Stream request failed: ${response.status} ${response.statusText}`);
+  }
+
+  yield* readSSEStream(response);
+}
+
+export async function* streamSectionRegenerate(
+  protocolId: string,
+  sectionId: string,
+  sectionName: string,
+  originalPrompt: string,
+  guidance: string | null,
+  signal?: AbortSignal,
+): AsyncGenerator<SSEEvent> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/sections/regenerate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ protocolId, sectionId, sectionName, originalPrompt, guidance }),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Stream request failed: ${response.status} ${response.statusText}`);
+  }
+
+  yield* readSSEStream(response);
 }

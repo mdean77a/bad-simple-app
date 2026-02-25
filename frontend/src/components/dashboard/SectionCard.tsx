@@ -33,9 +33,10 @@ interface SectionCardProps {
   onEdit?: () => void;
   onSave?: (content: string) => void;
   onCancel?: () => void;
+  onRegenerate?: () => void;
 }
 
-export function SectionCard({ section, onApprove, onEdit, onSave, onCancel }: SectionCardProps) {
+export function SectionCard({ section, onApprove, onEdit, onSave, onCancel, onRegenerate }: SectionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
 
@@ -146,6 +147,7 @@ export function SectionCard({ section, onApprove, onEdit, onSave, onCancel }: Se
               )}
               <button
                 disabled={actionsDisabled}
+                onClick={onRegenerate}
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={`Regenerate ${section.name}`}
               >

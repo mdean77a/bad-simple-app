@@ -382,4 +382,25 @@ describe("SectionCard", () => {
       screen.queryByRole("button", { name: /edit currently editing/i })
     ).not.toBeInTheDocument();
   });
+
+  // --- Regenerate button tests ---
+
+  it("calls onRegenerate when Regenerate button is clicked", async () => {
+    const onRegenerate = jest.fn();
+    render(<SectionCard section={readySection} onRegenerate={onRegenerate} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /regenerate purpose/i })
+    );
+
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onRegenerate when button is disabled", () => {
+    const onRegenerate = jest.fn();
+    render(<SectionCard section={generatingSection} onRegenerate={onRegenerate} />);
+
+    const btn = screen.getByRole("button", { name: /regenerate study procedures/i });
+    expect(btn).toBeDisabled();
+  });
 });

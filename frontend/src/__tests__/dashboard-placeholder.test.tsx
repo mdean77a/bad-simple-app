@@ -9,6 +9,10 @@ jest.mock("@/hooks/useSectionStreaming", () => ({
   useSectionStreaming: jest.fn(),
 }));
 
+jest.mock("@/lib/sse", () => ({
+  streamSectionRegenerate: jest.fn(),
+}));
+
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 
@@ -372,6 +376,100 @@ describe("Dashboard Page", () => {
       screen.getByText("The study will involve several procedures.")
     ).toBeInTheDocument();
     expect(screen.queryByText("Temporary changes")).not.toBeInTheDocument();
+  });
+
+  // --- Regenerate modal integration tests ---
+
+  it("clicking Regenerate opens the modal", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    const regenBtn = await screen.findByRole("button", {
+      name: /regenerate study procedures/i,
+    });
+    await userEvent.click(regenBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: /regenerate study procedures/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("clicking Cancel in regenerate modal closes it", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    renderWithOutline();
+
+    const regenBtn = await screen.findByRole("button", {
+      name: /regenerate study procedures/i,
+    });
+    await userEvent.click(regenBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("submitting regenerate modal sets section to generating", async () => {
+    const { streamSectionRegenerate } = require("@/lib/sse");
+
+    // Return an async generator that completes immediately
+    async function* fakeStream() {
+      // no events — just end
+    }
+    streamSectionRegenerate.mockReturnValue(fakeStream());
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    // Use sections where "Study Procedures" is ready (not generating)
+    const readySections: SectionState[] = [
+      {
+        id: "uuid-2",
+        name: "Study Procedures",
+        content: "The study will involve several procedures.",
+        status: "ready",
+        originalPrompt: "",
+      },
+    ];
+    renderWithSections(readySections);
+
+    const regenBtn = await screen.findByRole("button", {
+      name: /regenerate study procedures/i,
+    });
+    await userEvent.click(regenBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Regenerate" })
+    );
+
+    // Modal should close and section should show generating status
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Generating\.\.\./)).toBeInTheDocument();
+    });
   });
 
   it("saving edits to an approved section clears approval and sets status to edited", async () => {
