@@ -92,9 +92,13 @@ def _make_section_node(protocol_id, section_id, section_name, model, node_result
 
             context = "\n\n---\n\n".join(chunks)
             messages = _build_messages(section_name, context)
-            response = await model.ainvoke(messages)
 
-            content = response.content if isinstance(response.content, str) else ""
+            content_parts: list[str] = []
+            async for chunk in model.astream(messages):
+                text = chunk.content if isinstance(chunk.content, str) else ""
+                if text:
+                    content_parts.append(text)
+            content = "".join(content_parts)
             node_results[section_id] = {
                 "content": content,
                 "status": "ready",
@@ -165,6 +169,8 @@ async def stream_sections_parallel(
         )
 
     # Stream graph execution — token chunks from parallel LLM calls
+    completed_sections: set[str] = set()
+
     async for event in graph.astream_events({"results": {}}, version="v2"):
         if event["event"] == "on_chat_model_stream":
             node_name = event.get("metadata", {}).get("langgraph_node")
@@ -176,19 +182,42 @@ async def stream_sections_parallel(
                         {"sectionId": name_to_id[node_name], "content": text},
                     )
 
-    # Emit completion/error for each section
+        # Check if any section just completed
+        node_name = event.get("metadata", {}).get("langgraph_node")
+        if node_name and node_name in name_to_id:
+            section_id = name_to_id[node_name]
+            if section_id not in completed_sections and section_id in node_results:
+                completed_sections.add(section_id)
+                result = node_results[section_id]
+                if result.get("status") == "ready":
+                    yield _sse_event(
+                        "section_complete",
+                        {"sectionId": section_id, "status": "ready"},
+                    )
+                else:
+                    yield _sse_event(
+                        "section_error",
+                        {
+                            "sectionId": section_id,
+                            "status": "error",
+                            "message": result.get("error", "Section not processed"),
+                        },
+                    )
+
+    # Safety net: emit for any sections not caught during streaming
     for s in sections:
-        result = node_results.get(s["id"], {})
-        if result.get("status") == "ready":
-            yield _sse_event(
-                "section_complete", {"sectionId": s["id"], "status": "ready"}
-            )
-        else:
-            yield _sse_event(
-                "section_error",
-                {
-                    "sectionId": s["id"],
-                    "status": "error",
-                    "message": result.get("error", "Section not processed"),
-                },
-            )
+        if s["id"] not in completed_sections:
+            result = node_results.get(s["id"], {})
+            if result.get("status") == "ready":
+                yield _sse_event(
+                    "section_complete", {"sectionId": s["id"], "status": "ready"}
+                )
+            else:
+                yield _sse_event(
+                    "section_error",
+                    {
+                        "sectionId": s["id"],
+                        "status": "error",
+                        "message": result.get("error", "Section not processed"),
+                    },
+                )

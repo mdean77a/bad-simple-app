@@ -97,10 +97,17 @@ def test_build_section_graph_creates_nodes():
 @pytest.mark.asyncio
 @patch("src.services.section_graph.search_protocol")
 async def test_section_node_success(mock_search):
-    """Successful RAG + LLM call produces ready result."""
+    """Successful RAG + streaming LLM call produces ready result."""
+    from langchain_core.messages import AIMessageChunk
+
     mock_search.return_value = ["Protocol excerpt about purpose"]
     model = AsyncMock()
-    model.ainvoke = AsyncMock(return_value=AIMessage(content="Generated content"))
+
+    async def fake_astream(messages):
+        yield AIMessageChunk(content="Generated ")
+        yield AIMessageChunk(content="content")
+
+    model.astream = fake_astream
     node_results = {}
 
     node_fn = _make_section_node("proto-1", "sec-1", "Purpose", model, node_results)
@@ -136,7 +143,12 @@ async def test_section_node_llm_failure(mock_search):
     """LLM failure is caught and stored as error."""
     mock_search.return_value = ["Some context"]
     model = AsyncMock()
-    model.ainvoke = AsyncMock(side_effect=Exception("LLM timeout"))
+
+    async def failing_astream(messages):
+        raise Exception("LLM timeout")
+        yield  # pragma: no cover — make it an async generator
+
+    model.astream = failing_astream
     node_results = {}
 
     node_fn = _make_section_node("proto-1", "sec-1", "Purpose", model, node_results)
@@ -169,7 +181,12 @@ async def test_section_node_llm_config_error(mock_search):
     """LLMConfigError is caught and stored as error."""
     mock_search.return_value = ["Some context"]
     model = AsyncMock()
-    model.ainvoke = AsyncMock(side_effect=LLMConfigError("Key missing"))
+
+    async def failing_astream(messages):
+        raise LLMConfigError("Key missing")
+        yield  # pragma: no cover — make it an async generator
+
+    model.astream = failing_astream
     node_results = {}
 
     node_fn = _make_section_node("proto-1", "sec-1", "Purpose", model, node_results)
@@ -186,10 +203,12 @@ async def test_section_node_llm_config_error(mock_search):
 @patch("src.services.section_graph.build_section_graph")
 @patch("src.services.section_graph.get_chat_model")
 async def test_stream_emits_chunk_events(mock_get_model, mock_build_graph):
-    """on_chat_model_stream events from astream_events produce section_chunk SSE events."""
+    """on_chat_model_stream events produce section_chunk SSE; completion emitted inline."""
     from langchain_core.messages import AIMessageChunk
 
     mock_get_model.return_value = MagicMock()
+
+    node_results_ref = {}
 
     async def fake_astream_events(input, version):
         yield {
@@ -202,15 +221,33 @@ async def test_stream_emits_chunk_events(mock_get_model, mock_build_graph):
             "metadata": {"langgraph_node": "Purpose"},
             "data": {"chunk": AIMessageChunk(content="world")},
         }
+        # Simulate node completion — populate node_results and emit a node end event
+        node_results_ref["sec-1"] = {
+            "content": "Hello world", "status": "ready", "error": None,
+        }
+        yield {
+            "event": "on_chain_end",
+            "metadata": {"langgraph_node": "Purpose"},
+            "data": {},
+        }
 
     mock_graph = MagicMock()
     mock_graph.astream_events = fake_astream_events
 
     def build_side_effect(protocol_id, sections, model, node_results):
-        node_results["sec-1"] = {"content": "Hello world", "status": "ready", "error": None}
+        node_results_ref.update(node_results)  # share the dict reference
+        # Replace node_results in caller with our shared ref
+        node_results.update(node_results_ref)
         return mock_graph
 
-    mock_build_graph.side_effect = build_side_effect
+    # We need build_section_graph to give stream_sections_parallel
+    # the same dict that fake_astream_events mutates.
+    def build_side_effect2(protocol_id, sections, model, node_results):
+        nonlocal node_results_ref
+        node_results_ref = node_results
+        return mock_graph
+
+    mock_build_graph.side_effect = build_side_effect2
 
     sections = [{"id": "sec-1", "name": "Purpose"}]
     raw_events = []
@@ -223,6 +260,11 @@ async def test_stream_emits_chunk_events(mock_get_model, mock_build_graph):
     assert chunk_events[0]["data"]["sectionId"] == "sec-1"
     assert chunk_events[0]["data"]["content"] == "Hello "
     assert chunk_events[1]["data"]["content"] == "world"
+
+    # Completion should be emitted during the streaming loop (not safety-net)
+    complete_events = [e for e in events if e["event"] == "section_complete"]
+    assert len(complete_events) == 1
+    assert complete_events[0]["data"]["sectionId"] == "sec-1"
 
 
 @pytest.mark.asyncio
@@ -293,9 +335,15 @@ async def test_stream_llm_config_error_yields_errors_for_all(mock_get_model):
 @patch("src.services.section_graph.get_chat_model")
 async def test_stream_emits_section_start_for_all(mock_get_model, mock_search):
     """section_start events emitted for every requested section."""
+    from langchain_core.messages import AIMessageChunk
+
     mock_search.return_value = ["Protocol content"]
     model = AsyncMock()
-    model.ainvoke = AsyncMock(return_value=AIMessage(content="Content"))
+
+    async def fake_astream(messages):
+        yield AIMessageChunk(content="Content")
+
+    model.astream = fake_astream
     # Provide bind method for LangGraph internals
     model.bind = MagicMock(return_value=model)
     mock_get_model.return_value = model
@@ -321,9 +369,15 @@ async def test_stream_emits_section_start_for_all(mock_get_model, mock_search):
 @patch("src.services.section_graph.get_chat_model")
 async def test_stream_emits_section_complete(mock_get_model, mock_search):
     """Successful sections get section_complete events."""
+    from langchain_core.messages import AIMessageChunk
+
     mock_search.return_value = ["Protocol content"]
     model = AsyncMock()
-    model.ainvoke = AsyncMock(return_value=AIMessage(content="Content"))
+
+    async def fake_astream(messages):
+        yield AIMessageChunk(content="Content")
+
+    model.astream = fake_astream
     model.bind = MagicMock(return_value=model)
     mock_get_model.return_value = model
 
@@ -368,6 +422,7 @@ async def test_stream_emits_section_error_for_failed(mock_get_model, mock_search
 @patch("src.services.section_graph.get_chat_model")
 async def test_stream_mixed_success_and_error(mock_get_model, mock_search):
     """Mix of successful and failed sections produces correct events."""
+    from langchain_core.messages import AIMessageChunk
 
     def search_side_effect(protocol_id, section_name, k=20):
         if section_name == "Purpose":
@@ -376,7 +431,11 @@ async def test_stream_mixed_success_and_error(mock_get_model, mock_search):
 
     mock_search.side_effect = search_side_effect
     model = AsyncMock()
-    model.ainvoke = AsyncMock(return_value=AIMessage(content="Content"))
+
+    async def fake_astream(messages):
+        yield AIMessageChunk(content="Content")
+
+    model.astream = fake_astream
     model.bind = MagicMock(return_value=model)
     mock_get_model.return_value = model
 
@@ -401,3 +460,99 @@ async def test_stream_mixed_success_and_error(mock_get_model, mock_search):
     error_events = [e for e in events if e["event"] == "section_error"]
     assert len(error_events) == 1
     assert error_events[0]["data"]["sectionId"] == "sec-2"
+
+
+# --- Per-section completion ordering ---
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.build_section_graph")
+@patch("src.services.section_graph.get_chat_model")
+async def test_section_a_completes_before_section_b_finishes(
+    mock_get_model, mock_build_graph
+):
+    """Section A's section_complete appears before Section B's final chunk."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_get_model.return_value = MagicMock()
+    node_results_ref = {}
+
+    async def fake_astream_events(input, version):
+        # Section A streams tokens
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "Purpose"},
+            "data": {"chunk": AIMessageChunk(content="A content")},
+        }
+        # Section B starts streaming
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "Risks"},
+            "data": {"chunk": AIMessageChunk(content="B part1 ")},
+        }
+        # Section A finishes — node result appears
+        node_results_ref["sec-1"] = {
+            "content": "A content", "status": "ready", "error": None,
+        }
+        yield {
+            "event": "on_chain_end",
+            "metadata": {"langgraph_node": "Purpose"},
+            "data": {},
+        }
+        # Section B continues streaming AFTER A completed
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "Risks"},
+            "data": {"chunk": AIMessageChunk(content="B part2")},
+        }
+        # Section B finishes
+        node_results_ref["sec-2"] = {
+            "content": "B part1 B part2", "status": "ready", "error": None,
+        }
+        yield {
+            "event": "on_chain_end",
+            "metadata": {"langgraph_node": "Risks"},
+            "data": {},
+        }
+
+    mock_graph = MagicMock()
+    mock_graph.astream_events = fake_astream_events
+
+    def build_side_effect(protocol_id, sections, model, node_results):
+        nonlocal node_results_ref
+        node_results_ref = node_results
+        return mock_graph
+
+    mock_build_graph.side_effect = build_side_effect
+
+    sections = [
+        {"id": "sec-1", "name": "Purpose"},
+        {"id": "sec-2", "name": "Risks"},
+    ]
+    raw_events = []
+    async for event_str in stream_sections_parallel("proto-1", sections):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+
+    # Find positions of key events
+    a_complete_idx = next(
+        i for i, e in enumerate(events)
+        if e["event"] == "section_complete" and e["data"]["sectionId"] == "sec-1"
+    )
+    b_last_chunk_idx = max(
+        i for i, e in enumerate(events)
+        if e["event"] == "section_chunk" and e["data"]["sectionId"] == "sec-2"
+    )
+    b_complete_idx = next(
+        i for i, e in enumerate(events)
+        if e["event"] == "section_complete" and e["data"]["sectionId"] == "sec-2"
+    )
+
+    # Section A's completion must appear BEFORE Section B's last chunk
+    assert a_complete_idx < b_last_chunk_idx, (
+        f"Section A complete (idx={a_complete_idx}) should precede "
+        f"Section B's last chunk (idx={b_last_chunk_idx})"
+    )
+    # Section B completes after its last chunk
+    assert b_complete_idx > b_last_chunk_idx
