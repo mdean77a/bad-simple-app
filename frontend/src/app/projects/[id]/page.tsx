@@ -68,7 +68,7 @@ export default function DashboardPage() {
       setRegenSection(null);
 
       updateSectionRef.current(section.id, {
-        status: "generating",
+        status: "regenerating",
         content: "",
         approval: undefined,
       });

@@ -6,6 +6,7 @@ import { StatusIcon } from "@/components/common/StatusIcon";
 
 const borderColors: Record<SectionStatus, string> = {
   generating: "border-l-amber-400",
+  regenerating: "border-l-amber-400",
   ready: "border-l-slate-400",
   editing: "border-l-blue-400",
   edited: "border-l-slate-400",
@@ -15,6 +16,7 @@ const borderColors: Record<SectionStatus, string> = {
 
 const statusLabels: Record<SectionStatus, string> = {
   generating: "Generating...",
+  regenerating: "Regenerating...",
   ready: "Ready for review",
   editing: "Editing",
   edited: "Edited",
@@ -41,7 +43,7 @@ export function SectionCard({ section, onApprove, onEdit, onSave, onCancel, onRe
   const [editContent, setEditContent] = useState("");
 
   const titleId = `section-title-${section.id}`;
-  const isGenerating = section.status === "generating";
+  const isGenerating = section.status === "generating" || section.status === "regenerating";
   const isError = section.status === "error";
   const isApproved = section.status === "approved";
   const actionsDisabled = isGenerating || isError;

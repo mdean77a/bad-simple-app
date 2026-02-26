@@ -468,7 +468,7 @@ describe("Dashboard Page", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(screen.getByText(/Status: Generating\.\.\./)).toBeInTheDocument();
+      expect(screen.getByText(/Status: Regenerating\.\.\./)).toBeInTheDocument();
     });
   });
 
