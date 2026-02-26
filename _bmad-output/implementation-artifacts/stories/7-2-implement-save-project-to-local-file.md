@@ -1,6 +1,6 @@
 # Story 7.2: Implement Save Project to Local File
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -211,13 +211,33 @@ Claude Opus 4.6
 - 8 new tests for `sanitizeFilename` (spaces, unsafe chars, collapse, trim, truncate, empty, unsafe-only, mixed)
 - 7 new tests for `downloadProjectFile` (blob creation, filename, sanitization, href, DOM append/remove, createdAt passthrough, transient status mapping)
 - 2 new tests for ActionBar `onSaveProject` (click calls handler, disabled button doesn't call handler)
-- Full regression suite: 149 backend + 362 frontend tests pass (0 failures)
+- Full regression suite: 149 backend + 364 frontend tests pass (0 failures)
 - No changes to ProjectProvider/reducer — frontend-only operation reading directly from project state
 
 ### File List
 
-- `frontend/src/lib/projectFile.ts` — **MODIFIED** — Added `sanitizeFilename()`, `downloadProjectFile()`
+- `frontend/src/lib/projectFile.ts` — **MODIFIED** — Added `sanitizeFilename()`, `downloadProjectFile()`, added `protocolName` validation
 - `frontend/src/components/dashboard/ActionBar.tsx` — **MODIFIED** — Added `onSaveProject` prop, wired `onClick`
 - `frontend/src/app/projects/[id]/page.tsx` — **MODIFIED** — Added `handleSaveProject` callback, imported `downloadProjectFile`, passed to ActionBar
-- `frontend/src/__tests__/projectFile.test.ts` — **MODIFIED** — Added 15 tests (8 sanitizeFilename + 7 downloadProjectFile)
+- `frontend/src/__tests__/projectFile.test.ts` — **MODIFIED** — Added 16 tests (8 sanitizeFilename + 7 downloadProjectFile + 1 protocolName validation)
 - `frontend/src/__tests__/ActionBar.test.tsx` — **MODIFIED** — Added 2 tests (onSaveProject click + disabled state)
+- `frontend/src/__tests__/dashboard-placeholder.test.tsx` — **MODIFIED** — Added 1 integration test (Save Project wiring)
+
+### Senior Developer Review (AI)
+
+**Reviewer:** Claude Opus 4.6 on 2026-02-26
+
+**Issues Found:** 0 High, 4 Medium, 3 Low
+**Issues Fixed:** 4 (all Medium)
+**Action Items Created:** 0
+
+**Fixes Applied:**
+- M1: Fixed latent infinite recursion in `document.createElement` mock — captured original before spying
+- M2: Strengthened `createdAt` passthrough test — now verifies actual value in serialized JSON
+- M3: Added missing dashboard integration test — verifies `downloadProjectFile` is called with correct project state
+- M4: Added `protocolName` validation to `validateProjectFile` — prevents corrupted files from passing validation
+
+**Accepted Risks (Low):**
+- L1: `URL.revokeObjectURL` called synchronously after `click()` — works in Chrome/Safari, accepted for MVP
+- L2: No try-catch in `downloadProjectFile` — client-side blob creation essentially never fails
+- L3: `sanitizeFilename` permits `#` character — valid in OS filenames, low risk

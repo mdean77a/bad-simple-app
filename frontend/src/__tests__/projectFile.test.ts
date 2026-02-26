@@ -359,6 +359,14 @@ describe("validateProjectFile", () => {
     expect(result.errors).toContain('Missing required field: "protocolId"');
   });
 
+  it("rejects missing protocolName", () => {
+    const file = { ...makeValidProjectFile() };
+    delete (file as Record<string, unknown>).protocolName;
+    const result = validateProjectFile(file);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Missing required field: "protocolName"');
+  });
+
   it("rejects missing sections", () => {
     const file = { ...makeValidProjectFile() };
     delete (file as Record<string, unknown>).sections;
@@ -568,6 +576,7 @@ describe("downloadProjectFile", () => {
   let mockClick: jest.Mock;
   let capturedHref: string;
   let capturedDownload: string;
+  const originalCreateElement = document.createElement.bind(document);
 
   beforeEach(() => {
     mockCreateObjectURL = jest.fn(() => "blob:mock-url");
@@ -597,7 +606,7 @@ describe("downloadProjectFile", () => {
           click: mockClick,
         } as unknown as HTMLAnchorElement;
       }
-      return document.createElement(tag);
+      return originalCreateElement(tag);
     });
 
     jest
@@ -655,14 +664,13 @@ describe("downloadProjectFile", () => {
   });
 
   it("passes createdAt to serializeProject", () => {
+    const stringifySpy = jest.spyOn(JSON, "stringify");
     const state = makeProjectState();
     downloadProjectFile(state, "2025-01-01T00:00:00.000Z");
 
-    // Verify by inspecting the blob content
-    const blob = mockCreateObjectURL.mock.calls[0][0] as Blob;
-    expect(blob).toBeInstanceOf(Blob);
-    // The blob contains the serialized project — we can check it's valid
-    expect(mockClick).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(stringifySpy.mock.results[0].value as string);
+    expect(parsed.createdAt).toBe("2025-01-01T00:00:00.000Z");
+    stringifySpy.mockRestore();
   });
 
   it("serializes transient statuses as 'ready' in downloaded file", () => {

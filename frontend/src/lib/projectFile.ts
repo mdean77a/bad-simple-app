@@ -184,6 +184,9 @@ export function validateProjectFile(
   if (!obj.protocolId || typeof obj.protocolId !== "string") {
     errors.push('Missing required field: "protocolId"');
   }
+  if (!obj.protocolName || typeof obj.protocolName !== "string") {
+    errors.push('Missing required field: "protocolName"');
+  }
   if (!("sections" in obj)) {
     errors.push('Missing required field: "sections"');
   } else if (!Array.isArray(obj.sections)) {
