@@ -472,6 +472,129 @@ describe("Dashboard Page", () => {
     });
   });
 
+  // --- Approval tracking integration tests ---
+
+  it("editing an approved section immediately clears the approval badge", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const approvedSections: SectionState[] = [
+      {
+        id: "uuid-approved",
+        name: "Approved Section",
+        content: "Previously approved content.",
+        status: "approved",
+        originalPrompt: "",
+        approval: {
+          userName: "Jane",
+          userEmail: "jane@example.com",
+          timestamp: "2026-02-25T10:00:00Z",
+        },
+      },
+    ];
+
+    renderWithSections(approvedSections);
+
+    // Approval badge should be visible initially
+    await waitFor(() => {
+      expect(screen.getByText(/Approved by Jane/)).toBeInTheDocument();
+    });
+
+    // Click Edit
+    await userEvent.click(
+      screen.getByRole("button", { name: /edit approved section/i })
+    );
+
+    // Approval badge should disappear immediately
+    await waitFor(() => {
+      expect(screen.queryByText(/Approved by/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("canceling an edit on an approved section restores the approval badge", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const approvedSections: SectionState[] = [
+      {
+        id: "uuid-approved",
+        name: "Approved Section",
+        content: "Previously approved content.",
+        status: "approved",
+        originalPrompt: "",
+        approval: {
+          userName: "Jane",
+          userEmail: "jane@example.com",
+          timestamp: "2026-02-25T10:00:00Z",
+        },
+      },
+    ];
+
+    renderWithSections(approvedSections);
+
+    // Click Edit
+    const editBtn = await screen.findByRole("button", {
+      name: /edit approved section/i,
+    });
+    await userEvent.click(editBtn);
+
+    // Badge should be gone
+    await waitFor(() => {
+      expect(screen.queryByText(/Approved by/)).not.toBeInTheDocument();
+    });
+
+    // Click Cancel
+    await userEvent.click(
+      screen.getByRole("button", { name: /cancel editing approved section/i })
+    );
+
+    // Approval badge should be restored
+    await waitFor(() => {
+      expect(screen.getByText(/Approved by Jane/)).toBeInTheDocument();
+    });
+    // Status should be back to approved
+    expect(screen.getByText(/Status: Approved/)).toBeInTheDocument();
+  });
+
+  it("re-approving after edit shows the new approver", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Bob Smith", email: "bob@example.com" })
+    );
+
+    const editedSections: SectionState[] = [
+      {
+        id: "uuid-edited",
+        name: "Edited Section",
+        content: "Content that was edited.",
+        status: "edited",
+        originalPrompt: "",
+      },
+    ];
+
+    renderWithSections(editedSections);
+
+    // No approval badge should be shown
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Edited/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Approved by/)).not.toBeInTheDocument();
+
+    // Approve the section
+    await userEvent.click(
+      screen.getByRole("button", { name: /approve edited section/i })
+    );
+
+    // Should now show Bob as approver
+    await waitFor(() => {
+      expect(screen.getByText(/Approved by Bob Smith/)).toBeInTheDocument();
+    });
+  });
+
   it("saving edits to an approved section clears approval and sets status to edited", async () => {
     localStorage.setItem(
       "user",
