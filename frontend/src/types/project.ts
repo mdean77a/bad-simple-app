@@ -2,6 +2,7 @@ import type { OutlineSection } from "@/lib/api";
 
 export type SectionStatus =
   | "generating"
+  | "regenerating"
   | "ready"
   | "editing"
   | "edited"

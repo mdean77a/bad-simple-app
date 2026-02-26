@@ -74,6 +74,126 @@ def _build_messages(section_name: str, context: str) -> list:
     ]
 
 
+MAX_RETRIES = 3
+
+
+REGENERATE_SYSTEM_PROMPT = """\
+You are an expert clinical research writer specializing in Informed Consent Forms (ICFs).
+
+You are revising a specific section of an ICF. You will be given:
+1. The relevant clinical trial protocol content for reference
+2. The current version of the section
+3. Revision guidance from a reviewer
+
+Instructions:
+- Revise the section based on the reviewer's guidance
+- Keep the content grounded in the protocol — do NOT invent study details
+- Write clear, accessible language appropriate for research participants
+- Use plain language — avoid jargon or explain technical terms when necessary
+
+Write the revised section content directly. Do not include the section title as a heading — \
+just write the body text for the section."""
+
+
+async def stream_section_regenerate(
+    protocol_id: str,
+    section_id: str,
+    section_name: str,
+    current_content: str,
+    guidance: str | None = None,
+) -> AsyncGenerator[str, None]:
+    """Yield SSE events for regenerating a single section.
+
+    Retrieves protocol context via RAG, builds a revision prompt with the
+    current content and reviewer guidance, and streams the LLM response
+    token-by-token.  Retries up to MAX_RETRIES times on transient failures;
+    re-raises VectorStoreError and LLMConfigError immediately.
+    """
+    yield _sse_event("section_start", {"sectionId": section_id, "name": section_name})
+
+    try:
+        model = get_chat_model()
+    except LLMConfigError as exc:
+        yield _sse_event(
+            "section_error",
+            {"sectionId": section_id, "status": "error", "message": str(exc)},
+        )
+        return
+
+    try:
+        chunks = await asyncio.to_thread(
+            search_protocol, protocol_id, section_name, k=20
+        )
+    except VectorStoreError as exc:
+        yield _sse_event(
+            "section_error",
+            {"sectionId": section_id, "status": "error", "message": str(exc)},
+        )
+        return
+
+    if not chunks:
+        yield _sse_event(
+            "section_error",
+            {
+                "sectionId": section_id,
+                "status": "error",
+                "message": "No relevant protocol content found",
+            },
+        )
+        return
+
+    context = "\n\n---\n\n".join(chunks)
+    human_content = (
+        f'Revise the "{section_name}" section of an Informed Consent Form.\n\n'
+        f"Relevant protocol content:\n\n{context}\n\n"
+        f"Current version of this section:\n\n{current_content}"
+    )
+    if guidance:
+        human_content += f"\n\nReviewer guidance:\n{guidance}"
+    else:
+        human_content += "\n\nPlease improve the clarity and quality of this section."
+
+    messages = [
+        SystemMessage(content=REGENERATE_SYSTEM_PROMPT),
+        HumanMessage(content=human_content),
+    ]
+
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            async for chunk in model.astream(messages):
+                text = _extract_chunk_text(chunk)
+                if text:
+                    yield _sse_event(
+                        "section_chunk",
+                        {"sectionId": section_id, "content": text},
+                    )
+            yield _sse_event(
+                "section_complete", {"sectionId": section_id, "status": "ready"}
+            )
+            return
+        except (VectorStoreError, LLMConfigError):
+            raise
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Section regeneration attempt %d/%d failed for '%s': %s",
+                attempt,
+                MAX_RETRIES,
+                section_name,
+                exc,
+            )
+
+    yield _sse_event(
+        "section_error",
+        {
+            "sectionId": section_id,
+            "status": "error",
+            "message": f"Regeneration failed after {MAX_RETRIES} attempts: {last_error}",
+        },
+    )
+
+
 def _make_section_node(protocol_id, section_id, section_name, model, node_results):
     """Create a graph node function for a single section."""
 

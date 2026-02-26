@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useProject } from "@/lib/project";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionBar } from "@/components/dashboard/ActionBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
+import { RegenerateModal } from "@/components/dashboard/RegenerateModal";
 import { useSectionStreaming } from "@/hooks/useSectionStreaming";
-import type { SectionStatus } from "@/types/project";
+import { streamSectionRegenerate } from "@/lib/sse";
+import type { SectionState, SectionStatus } from "@/types/project";
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -16,6 +18,12 @@ export default function DashboardPage() {
 
   // Track previous status for cancel restoration
   const prevStatusRef = useRef<Record<string, SectionStatus>>({});
+
+  // Regenerate modal state
+  const [regenSection, setRegenSection] = useState<SectionState | null>(null);
+  const regenAbortRef = useRef<AbortController | null>(null);
+  const updateSectionRef = useRef(updateSection);
+  updateSectionRef.current = updateSection;
 
   const handleApprove = (sectionId: string) => {
     if (!user) return;
@@ -51,6 +59,63 @@ export default function DashboardPage() {
     updateSection(sectionId, { status: previousStatus });
     delete prevStatusRef.current[sectionId];
   };
+
+  const handleRegenerateSubmit = useCallback(
+    (guidance: string) => {
+      if (!regenSection || !project.protocolId) return;
+
+      const section = regenSection;
+      setRegenSection(null);
+
+      updateSectionRef.current(section.id, {
+        status: "regenerating",
+        content: "",
+        approval: undefined,
+      });
+
+      const controller = new AbortController();
+      regenAbortRef.current = controller;
+      let contentAccum = "";
+
+      (async () => {
+        try {
+          for await (const event of streamSectionRegenerate(
+            project.protocolId,
+            section.id,
+            section.name,
+            section.content,
+            guidance || null,
+            controller.signal,
+          )) {
+            switch (event.event) {
+              case "section_chunk":
+                contentAccum += event.content;
+                updateSectionRef.current(event.sectionId, {
+                  content: contentAccum,
+                });
+                break;
+              case "section_complete":
+                updateSectionRef.current(event.sectionId, { status: "ready" });
+                break;
+              case "section_error":
+                updateSectionRef.current(event.sectionId, {
+                  status: "error",
+                  content: event.message,
+                });
+                break;
+            }
+          }
+        } catch (err) {
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          updateSectionRef.current(section.id, {
+            status: "error",
+            content: String(err),
+          });
+        }
+      })();
+    },
+    [regenSection, project.protocolId],
+  );
 
   useSectionStreaming();
   const router = useRouter();
@@ -97,12 +162,19 @@ export default function DashboardPage() {
                   onEdit={() => handleEdit(section.id)}
                   onSave={(content) => handleSave(section.id, content)}
                   onCancel={() => handleCancel(section.id)}
+                  onRegenerate={() => setRegenSection(section)}
                 />
               ))}
             </div>
           )}
         </div>
       </main>
+      <RegenerateModal
+        sectionName={regenSection?.name ?? ""}
+        isOpen={regenSection !== null}
+        onClose={() => setRegenSection(null)}
+        onSubmit={handleRegenerateSubmit}
+      />
     </div>
   );
 }

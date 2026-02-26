@@ -12,6 +12,7 @@ from src.services.section_graph import (
     _make_section_node,
     _sse_event,
     build_section_graph,
+    stream_section_regenerate,
     stream_sections_parallel,
 )
 from src.services.vector_store import VectorStoreError
@@ -556,3 +557,297 @@ async def test_section_a_completes_before_section_b_finishes(
     )
     # Section B completes after its last chunk
     assert b_complete_idx > b_last_chunk_idx
+
+
+# --- stream_section_regenerate ---
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_success_stream(mock_get_model, mock_search):
+    """Successful regeneration emits start → chunk(s) → complete."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol excerpt"]
+    model = AsyncMock()
+
+    async def fake_astream(messages):
+        yield AIMessageChunk(content="Regenerated ")
+        yield AIMessageChunk(content="content")
+
+    model.astream = fake_astream
+    mock_get_model.return_value = model
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="This study evaluates safety.",
+    ):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    assert events[0]["event"] == "section_start"
+    assert events[0]["data"]["sectionId"] == "sec-1"
+    assert events[0]["data"]["name"] == "Purpose"
+
+    chunks = [e for e in events if e["event"] == "section_chunk"]
+    assert len(chunks) == 2
+    assert chunks[0]["data"]["content"] == "Regenerated "
+    assert chunks[1]["data"]["content"] == "content"
+
+    complete = [e for e in events if e["event"] == "section_complete"]
+    assert len(complete) == 1
+    assert complete[0]["data"]["status"] == "ready"
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_prompt_includes_current_content_and_context(
+    mock_get_model, mock_search,
+):
+    """Prompt includes RAG context, current content, and revision framing."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol context about dosing"]
+    model = AsyncMock()
+    captured_messages = []
+
+    async def fake_astream(messages):
+        captured_messages.extend(messages)
+        yield AIMessageChunk(content="ok")
+
+    model.astream = fake_astream
+    mock_get_model.return_value = model
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="This study evaluates safety.",
+        guidance="Be more concise",
+    ):
+        raw_events.append(event_str)
+
+    system_msg = captured_messages[0]
+    assert "revising" in system_msg.content.lower()
+
+    human_msg = captured_messages[1]
+    assert 'Revise the "Purpose"' in human_msg.content
+    assert "Protocol context about dosing" in human_msg.content
+    assert "This study evaluates safety." in human_msg.content
+    assert "Reviewer guidance:" in human_msg.content
+    assert "Be more concise" in human_msg.content
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_no_guidance_uses_default_instruction(mock_get_model, mock_search):
+    """Without guidance, a default improvement instruction is used."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol context"]
+    model = AsyncMock()
+    captured_messages = []
+
+    async def fake_astream(messages):
+        captured_messages.extend(messages)
+        yield AIMessageChunk(content="ok")
+
+    model.astream = fake_astream
+    mock_get_model.return_value = model
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="Existing content here.",
+    ):
+        raw_events.append(event_str)
+
+    human_msg = captured_messages[1]
+    assert "Existing content here." in human_msg.content
+    assert "Reviewer guidance:" not in human_msg.content
+    assert "improve the clarity" in human_msg.content
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_llm_config_error(mock_get_model):
+    """LLMConfigError yields section_start then section_error."""
+    mock_get_model.side_effect = LLMConfigError("API key missing")
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="Existing content.",
+    ):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    assert events[0]["event"] == "section_start"
+    assert events[1]["event"] == "section_error"
+    assert "API key missing" in events[1]["data"]["message"]
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_vector_store_error(mock_get_model, mock_search):
+    """VectorStoreError yields section_error without retries."""
+    mock_search.side_effect = VectorStoreError("Connection refused")
+    mock_get_model.return_value = MagicMock()
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="Existing content.",
+    ):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    assert events[0]["event"] == "section_start"
+    assert events[1]["event"] == "section_error"
+    assert "Connection refused" in events[1]["data"]["message"]
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_empty_rag_results(mock_get_model, mock_search):
+    """Empty RAG results yield section_error."""
+    mock_search.return_value = []
+    mock_get_model.return_value = MagicMock()
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="Existing content.",
+    ):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    assert events[0]["event"] == "section_start"
+    assert events[1]["event"] == "section_error"
+    assert "No relevant protocol content" in events[1]["data"]["message"]
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_retries_on_transient_failure(mock_get_model, mock_search):
+    """Transient failures are retried up to 3 times, then emit section_error."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol context"]
+    model = AsyncMock()
+    call_count = 0
+
+    async def failing_astream(messages):
+        nonlocal call_count
+        call_count += 1
+        raise Exception("Transient error")
+        yield  # pragma: no cover — make it an async generator
+
+    model.astream = failing_astream
+    mock_get_model.return_value = model
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="Existing content.",
+    ):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    assert call_count == 3
+
+    error_events = [e for e in events if e["event"] == "section_error"]
+    assert len(error_events) == 1
+    assert "after 3 attempts" in error_events[0]["data"]["message"]
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_succeeds_on_second_attempt(mock_get_model, mock_search):
+    """If first attempt fails but second succeeds, section_complete is emitted."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol context"]
+    model = AsyncMock()
+    call_count = 0
+
+    async def flaky_astream(messages):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise Exception("Transient error")
+        yield AIMessageChunk(content="Success")
+
+    model.astream = flaky_astream
+    mock_get_model.return_value = model
+
+    raw_events = []
+    async for event_str in stream_section_regenerate(
+        protocol_id="proto-1",
+        section_id="sec-1",
+        section_name="Purpose",
+        current_content="Existing content.",
+    ):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    assert call_count == 2
+
+    complete = [e for e in events if e["event"] == "section_complete"]
+    assert len(complete) == 1
+    assert complete[0]["data"]["status"] == "ready"
+
+    # No error events
+    errors = [e for e in events if e["event"] == "section_error"]
+    assert len(errors) == 0
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_regen_vector_store_error_during_stream_not_retried(
+    mock_get_model, mock_search,
+):
+    """VectorStoreError raised during astream is re-raised (not retried)."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol context"]
+    model = AsyncMock()
+
+    async def raise_vector_error(messages):
+        raise VectorStoreError("Qdrant down")
+        yield  # pragma: no cover
+
+    model.astream = raise_vector_error
+    mock_get_model.return_value = model
+
+    # VectorStoreError should propagate (re-raised immediately, not caught by retry)
+    with pytest.raises(VectorStoreError, match="Qdrant down"):
+        async for _ in stream_section_regenerate(
+            protocol_id="proto-1",
+            section_id="sec-1",
+            section_name="Purpose",
+            current_content="Existing content.",
+        ):
+            pass

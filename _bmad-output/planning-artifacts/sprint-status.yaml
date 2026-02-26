@@ -78,7 +78,7 @@ development_status:
   # Epic 5: Section Review Workflow
   epic-5: in-progress
   5-1-implement-section-approve-action: done
-  5-2-implement-inline-section-editing: in-progress
+  5-2-implement-inline-section-editing: done
   5-3-implement-section-regeneration-endpoint: backlog
   5-4-build-regenerate-modal-with-guidance-input: backlog
   epic-5-retrospective: optional

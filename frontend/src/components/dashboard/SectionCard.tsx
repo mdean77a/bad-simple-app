@@ -6,6 +6,7 @@ import { StatusIcon } from "@/components/common/StatusIcon";
 
 const borderColors: Record<SectionStatus, string> = {
   generating: "border-l-amber-400",
+  regenerating: "border-l-amber-400",
   ready: "border-l-slate-400",
   editing: "border-l-blue-400",
   edited: "border-l-slate-400",
@@ -15,6 +16,7 @@ const borderColors: Record<SectionStatus, string> = {
 
 const statusLabels: Record<SectionStatus, string> = {
   generating: "Generating...",
+  regenerating: "Regenerating...",
   ready: "Ready for review",
   editing: "Editing",
   edited: "Edited",
@@ -33,14 +35,15 @@ interface SectionCardProps {
   onEdit?: () => void;
   onSave?: (content: string) => void;
   onCancel?: () => void;
+  onRegenerate?: () => void;
 }
 
-export function SectionCard({ section, onApprove, onEdit, onSave, onCancel }: SectionCardProps) {
+export function SectionCard({ section, onApprove, onEdit, onSave, onCancel, onRegenerate }: SectionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
 
   const titleId = `section-title-${section.id}`;
-  const isGenerating = section.status === "generating";
+  const isGenerating = section.status === "generating" || section.status === "regenerating";
   const isError = section.status === "error";
   const isApproved = section.status === "approved";
   const actionsDisabled = isGenerating || isError;
@@ -146,6 +149,7 @@ export function SectionCard({ section, onApprove, onEdit, onSave, onCancel }: Se
               )}
               <button
                 disabled={actionsDisabled}
+                onClick={onRegenerate}
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={`Regenerate ${section.name}`}
               >
