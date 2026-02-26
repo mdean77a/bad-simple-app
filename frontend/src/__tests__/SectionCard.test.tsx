@@ -27,6 +27,15 @@ const approvedSection: SectionState = {
   originalPrompt: "",
 };
 
+const approvedSectionWithApproval: SectionState = {
+  ...approvedSection,
+  approval: {
+    userName: "Sarah Chen",
+    userEmail: "sarah@dcc.org",
+    timestamp: new Date(2026, 1, 25, 14, 30, 0).toISOString(),
+  },
+};
+
 const errorSection: SectionState = {
   id: "sec-4",
   name: "Contact Information",
@@ -381,6 +390,24 @@ describe("SectionCard", () => {
     expect(
       screen.queryByRole("button", { name: /edit currently editing/i })
     ).not.toBeInTheDocument();
+  });
+
+  // --- Approval badge tests ---
+
+  it("shows approval badge when section has approval data", () => {
+    render(<SectionCard section={approvedSectionWithApproval} />);
+    expect(screen.getByText(/Approved by Sarah Chen/)).toBeInTheDocument();
+    expect(screen.getByText(/Feb 25, 2026 at 2:30 PM/)).toBeInTheDocument();
+  });
+
+  it("does not show approval badge when section has no approval data", () => {
+    render(<SectionCard section={readySection} />);
+    expect(screen.queryByText(/Approved by/)).not.toBeInTheDocument();
+  });
+
+  it("does not show approval badge for approved section without approval record", () => {
+    render(<SectionCard section={approvedSection} />);
+    expect(screen.queryByText(/Approved by/)).not.toBeInTheDocument();
   });
 
   // --- Regenerate button tests ---

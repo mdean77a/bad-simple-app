@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SectionState, SectionStatus } from "@/types/project";
 import { StatusIcon } from "@/components/common/StatusIcon";
+import { ApprovalBadge } from "@/components/dashboard/ApprovalBadge";
 
 const borderColors: Record<SectionStatus, string> = {
   generating: "border-l-amber-400",
@@ -178,6 +179,14 @@ export function SectionCard({ section, onApprove, onEdit, onSave, onCancel, onRe
       <p className="mt-2 text-sm text-slate-500">
         {words} words &middot; Status: {statusLabels[section.status]}
       </p>
+
+      {/* Approval badge */}
+      {section.approval && (
+        <ApprovalBadge
+          userName={section.approval.userName}
+          timestamp={section.approval.timestamp}
+        />
+      )}
 
       {/* Content area */}
       <div
