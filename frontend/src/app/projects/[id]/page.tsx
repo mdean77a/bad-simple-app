@@ -66,6 +66,23 @@ export default function DashboardPage() {
     delete prevStatusRef.current[sectionId];
   };
 
+  const handleApproveAll = () => {
+    if (!user) return;
+    const now = new Date().toISOString();
+    for (const section of project.sections) {
+      if (section.status === "ready" || section.status === "edited") {
+        updateSection(section.id, {
+          status: "approved",
+          approval: {
+            userName: user.name,
+            userEmail: user.email,
+            timestamp: now,
+          },
+        });
+      }
+    }
+  };
+
   const handleRegenerateSubmit = useCallback(
     (guidance: string) => {
       if (!regenSection || !project.protocolId) return;
@@ -149,7 +166,7 @@ export default function DashboardPage() {
           router.push(`/projects/${protocolId}/outline`);
         }}
       />
-      <ActionBar />
+      <ActionBar sections={project.sections} onApproveAll={handleApproveAll} />
       <main className="flex-1 px-4 py-6 sm:px-6">
         <div className="mx-auto max-w-7xl">
           {project.sections.length === 0 ? (

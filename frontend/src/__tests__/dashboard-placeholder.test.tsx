@@ -595,6 +595,60 @@ describe("Dashboard Page", () => {
     });
   });
 
+  it("Approve All approves all ready/edited sections and shows approval badges", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const mixedSections: SectionState[] = [
+      {
+        id: "uuid-ready",
+        name: "Ready Section",
+        content: "Ready content.",
+        status: "ready",
+        originalPrompt: "",
+      },
+      {
+        id: "uuid-edited",
+        name: "Edited Section",
+        content: "Edited content.",
+        status: "edited",
+        originalPrompt: "",
+      },
+      {
+        id: "uuid-approved",
+        name: "Already Approved",
+        content: "Approved content.",
+        status: "approved",
+        originalPrompt: "",
+        approval: {
+          userName: "Bob",
+          userEmail: "bob@example.com",
+          timestamp: "2026-02-25T10:00:00Z",
+        },
+      },
+    ];
+
+    renderWithSections(mixedSections);
+
+    const approveAllBtn = await screen.findByRole("button", {
+      name: /approve all/i,
+    });
+    expect(approveAllBtn).toBeEnabled();
+    await userEvent.click(approveAllBtn);
+
+    // All sections should now be approved
+    await waitFor(() => {
+      expect(screen.getByText("All Approved")).toBeInTheDocument();
+    });
+
+    // Ready and Edited sections should show Jane as approver
+    expect(screen.getAllByText(/Approved by Jane/).length).toBeGreaterThanOrEqual(2);
+    // Already-approved section should still show Bob
+    expect(screen.getByText(/Approved by Bob/)).toBeInTheDocument();
+  });
+
   it("saving edits to an approved section clears approval and sets status to edited", async () => {
     localStorage.setItem(
       "user",
