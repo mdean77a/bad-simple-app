@@ -67,7 +67,7 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: Section Generation & Streaming
-  epic-4: in-progress
+  epic-4: done
   4-1-implement-section-generation-streaming-endpoint: done
   4-2-build-section-dashboard-layout: done
   4-3-implement-section-card-with-streaming-display: done
@@ -76,11 +76,11 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Section Review Workflow
-  epic-5: in-progress
+  epic-5: done
   5-1-implement-section-approve-action: done
   5-2-implement-inline-section-editing: done
-  5-3-implement-section-regeneration-endpoint: backlog
-  5-4-build-regenerate-modal-with-guidance-input: backlog
+  5-3-implement-section-regeneration-endpoint: done
+  5-4-build-regenerate-modal-with-guidance-input: done
   epic-5-retrospective: optional
 
   # Epic 6: Approval Tracking & Audit
