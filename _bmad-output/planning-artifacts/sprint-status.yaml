@@ -84,11 +84,11 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: Approval Tracking & Audit
-  epic-6: backlog
-  6-1-display-approval-information-on-section-cards: backlog
-  6-2-track-re-approval-after-edits: backlog
-  6-3-implement-approve-all-sections-button: backlog
-  6-4-build-action-bar-with-progress-display: backlog
+  epic-6: done
+  6-1-display-approval-information-on-section-cards: done
+  6-2-track-re-approval-after-edits: done
+  6-3-implement-approve-all-sections-button: done
+  6-4-build-action-bar-with-progress-display: done
   epic-6-retrospective: optional
 
   # Epic 7: Project Persistence
