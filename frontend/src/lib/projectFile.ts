@@ -7,6 +7,43 @@ import type {
 
 const CURRENT_VERSION = "1.0";
 
+/**
+ * Sanitizes a string for use as a filename.
+ * Replaces spaces with underscores, removes unsafe characters, and trims length.
+ */
+export function sanitizeFilename(name: string): string {
+  const sanitized = name
+    .replace(/[/\\:*?"<>|]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 100);
+  return sanitized || "project";
+}
+
+/**
+ * Serializes the current project state and triggers a browser file download.
+ * Uses URL.createObjectURL + anchor element pattern.
+ */
+export function downloadProjectFile(
+  project: ProjectState,
+  createdAt?: string
+): void {
+  const projectFile = serializeProject(project, createdAt);
+  const jsonString = JSON.stringify(projectFile, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${sanitizeFilename(project.protocolName)}_ICF.json`;
+  document.body.appendChild(a);
+  a.click();
+
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 const PERSISTABLE_STATUSES: PersistableStatus[] = ["ready", "edited", "approved"];
 
 const KNOWN_TOP_LEVEL_KEYS = new Set([
@@ -146,6 +183,9 @@ export function validateProjectFile(
   }
   if (!obj.protocolId || typeof obj.protocolId !== "string") {
     errors.push('Missing required field: "protocolId"');
+  }
+  if (!obj.protocolName || typeof obj.protocolName !== "string") {
+    errors.push('Missing required field: "protocolName"');
   }
   if (!("sections" in obj)) {
     errors.push('Missing required field: "sections"');

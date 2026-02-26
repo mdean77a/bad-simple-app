@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import DashboardPage from "@/app/projects/[id]/page";
 import { AuthProvider } from "@/lib/auth";
 import { ProjectProvider, useProject } from "@/lib/project";
+import { downloadProjectFile } from "@/lib/projectFile";
 import type { ConfirmedOutline, SectionState } from "@/types/project";
 
 jest.mock("@/hooks/useSectionStreaming", () => ({
@@ -11,6 +12,11 @@ jest.mock("@/hooks/useSectionStreaming", () => ({
 
 jest.mock("@/lib/sse", () => ({
   streamSectionRegenerate: jest.fn(),
+}));
+
+jest.mock("@/lib/projectFile", () => ({
+  ...jest.requireActual("@/lib/projectFile"),
+  downloadProjectFile: jest.fn(),
 }));
 
 const mockPush = jest.fn();
@@ -647,6 +653,41 @@ describe("Dashboard Page", () => {
     expect(screen.getAllByText(/Approved by Jane/).length).toBeGreaterThanOrEqual(2);
     // Already-approved section should still show Bob
     expect(screen.getByText(/Approved by Bob/)).toBeInTheDocument();
+  });
+
+  // --- Save Project integration test ---
+
+  it("clicking Save Project calls downloadProjectFile with current project state", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const readySections: SectionState[] = [
+      {
+        id: "uuid-2",
+        name: "Study Procedures",
+        content: "The study will involve several procedures.",
+        status: "ready",
+        originalPrompt: "",
+      },
+    ];
+    renderWithSections(readySections);
+
+    const saveBtn = await screen.findByRole("button", {
+      name: /save project/i,
+    });
+    await userEvent.click(saveBtn);
+
+    expect(downloadProjectFile).toHaveBeenCalledTimes(1);
+    expect(downloadProjectFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        protocolId: "protocol_test_123",
+        sections: expect.arrayContaining([
+          expect.objectContaining({ id: "uuid-2", name: "Study Procedures" }),
+        ]),
+      })
+    );
   });
 
   it("saving edits to an approved section clears approval and sets status to edited", async () => {
