@@ -229,4 +229,28 @@ describe("ActionBar", () => {
       screen.getByRole("button", { name: /save project/i })
     ).toBeEnabled();
   });
+
+  it("calls onSaveProject when Save Project button is clicked", async () => {
+    const onSaveProject = jest.fn();
+    const sections = [makeSection({ status: "ready" })];
+    render(<ActionBar sections={sections} onSaveProject={onSaveProject} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /save project/i })
+    );
+
+    expect(onSaveProject).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onSaveProject when button is disabled (generating)", async () => {
+    const onSaveProject = jest.fn();
+    const sections = [makeSection({ status: "generating" })];
+    render(<ActionBar sections={sections} onSaveProject={onSaveProject} />);
+
+    const button = screen.getByRole("button", { name: /save project/i });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+
+    expect(onSaveProject).not.toHaveBeenCalled();
+  });
 });

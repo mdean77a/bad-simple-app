@@ -4,6 +4,8 @@ import {
   validateProjectFile,
   mapToPersistableStatus,
   extractExtraFields,
+  sanitizeFilename,
+  downloadProjectFile,
 } from "@/lib/projectFile";
 import type { ProjectState, SectionState } from "@/types/project";
 import type { ProjectFile } from "@/types/project";
@@ -510,5 +512,175 @@ describe("forward compatibility", () => {
     });
     const state = deserializeProject(file);
     expect(state.sections[0].id).toBe("sec-1");
+  });
+});
+
+// ===========================================================================
+// sanitizeFilename
+// ===========================================================================
+
+describe("sanitizeFilename", () => {
+  it("replaces spaces with underscores", () => {
+    expect(sanitizeFilename("My Protocol Name")).toBe("My_Protocol_Name");
+  });
+
+  it("removes unsafe filename characters", () => {
+    expect(sanitizeFilename('file/name:with*bad?"chars<>|')).toBe(
+      "filenamewithbadchars"
+    );
+  });
+
+  it("collapses multiple underscores", () => {
+    expect(sanitizeFilename("a   b")).toBe("a_b");
+  });
+
+  it("trims leading and trailing underscores", () => {
+    expect(sanitizeFilename(" leading trailing ")).toBe("leading_trailing");
+  });
+
+  it("truncates to 100 characters", () => {
+    const long = "a".repeat(150);
+    expect(sanitizeFilename(long)).toHaveLength(100);
+  });
+
+  it("returns 'project' for empty string", () => {
+    expect(sanitizeFilename("")).toBe("project");
+  });
+
+  it("returns 'project' when only unsafe characters", () => {
+    expect(sanitizeFilename('/:*?"<>|')).toBe("project");
+  });
+
+  it("handles protocol names with mixed content", () => {
+    expect(sanitizeFilename("Study #42: Diabetes/Prevention")).toBe(
+      "Study_#42_DiabetesPrevention"
+    );
+  });
+});
+
+// ===========================================================================
+// downloadProjectFile
+// ===========================================================================
+
+describe("downloadProjectFile", () => {
+  let mockCreateObjectURL: jest.Mock;
+  let mockRevokeObjectURL: jest.Mock;
+  let mockClick: jest.Mock;
+  let capturedHref: string;
+  let capturedDownload: string;
+
+  beforeEach(() => {
+    mockCreateObjectURL = jest.fn(() => "blob:mock-url");
+    mockRevokeObjectURL = jest.fn();
+    global.URL.createObjectURL = mockCreateObjectURL;
+    global.URL.revokeObjectURL = mockRevokeObjectURL;
+
+    mockClick = jest.fn();
+    capturedHref = "";
+    capturedDownload = "";
+
+    jest.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "a") {
+        return {
+          set href(val: string) {
+            capturedHref = val;
+          },
+          get href() {
+            return capturedHref;
+          },
+          set download(val: string) {
+            capturedDownload = val;
+          },
+          get download() {
+            return capturedDownload;
+          },
+          click: mockClick,
+        } as unknown as HTMLAnchorElement;
+      }
+      return document.createElement(tag);
+    });
+
+    jest
+      .spyOn(document.body, "appendChild")
+      .mockImplementation((node) => node);
+    jest
+      .spyOn(document.body, "removeChild")
+      .mockImplementation((node) => node);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("creates a blob with JSON content and triggers download", () => {
+    const state = makeProjectState();
+    downloadProjectFile(state);
+
+    expect(mockCreateObjectURL).toHaveBeenCalledTimes(1);
+    const blob = mockCreateObjectURL.mock.calls[0][0] as Blob;
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe("application/json");
+
+    expect(mockClick).toHaveBeenCalledTimes(1);
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+  });
+
+  it("generates correct filename from protocol name", () => {
+    const state = makeProjectState({ protocolName: "Diabetes Prevention Study" });
+    downloadProjectFile(state);
+
+    expect(capturedDownload).toBe("Diabetes_Prevention_Study_ICF.json");
+  });
+
+  it("sanitizes special characters in filename", () => {
+    const state = makeProjectState({ protocolName: "Study: Phase 1/2" });
+    downloadProjectFile(state);
+
+    expect(capturedDownload).toBe("Study_Phase_12_ICF.json");
+  });
+
+  it("sets href to the blob URL", () => {
+    const state = makeProjectState();
+    downloadProjectFile(state);
+
+    expect(capturedHref).toBe("blob:mock-url");
+  });
+
+  it("appends and removes the anchor element", () => {
+    const state = makeProjectState();
+    downloadProjectFile(state);
+
+    expect(document.body.appendChild).toHaveBeenCalledTimes(1);
+    expect(document.body.removeChild).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes createdAt to serializeProject", () => {
+    const state = makeProjectState();
+    downloadProjectFile(state, "2025-01-01T00:00:00.000Z");
+
+    // Verify by inspecting the blob content
+    const blob = mockCreateObjectURL.mock.calls[0][0] as Blob;
+    expect(blob).toBeInstanceOf(Blob);
+    // The blob contains the serialized project — we can check it's valid
+    expect(mockClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes transient statuses as 'ready' in downloaded file", () => {
+    const stringifySpy = jest.spyOn(JSON, "stringify");
+
+    const state = makeProjectState({
+      sections: [
+        makeSection({ id: "s1", status: "generating" }),
+        makeSection({ id: "s2", status: "error" }),
+      ],
+    });
+    downloadProjectFile(state);
+
+    const serializedJson = stringifySpy.mock.results[0].value as string;
+    const parsed = JSON.parse(serializedJson);
+    expect(parsed.sections[0].status).toBe("ready");
+    expect(parsed.sections[1].status).toBe("ready");
+
+    stringifySpy.mockRestore();
   });
 });

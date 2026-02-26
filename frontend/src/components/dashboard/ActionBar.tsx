@@ -5,9 +5,10 @@ import type { SectionState } from "@/types/project";
 interface ActionBarProps {
   sections?: SectionState[];
   onApproveAll?: () => void;
+  onSaveProject?: () => void;
 }
 
-export function ActionBar({ sections = [], onApproveAll }: ActionBarProps) {
+export function ActionBar({ sections = [], onApproveAll, onSaveProject }: ActionBarProps) {
   const total = sections.length;
   const approvedCount = sections.filter((s) => s.status === "approved").length;
   const anyGenerating = sections.some(
@@ -87,6 +88,7 @@ export function ActionBar({ sections = [], onApproveAll }: ActionBarProps) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               disabled={anyGenerating}
+              onClick={onSaveProject}
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Save project"
             >

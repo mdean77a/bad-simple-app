@@ -10,6 +10,7 @@ import { SectionCard } from "@/components/dashboard/SectionCard";
 import { RegenerateModal } from "@/components/dashboard/RegenerateModal";
 import { useSectionStreaming } from "@/hooks/useSectionStreaming";
 import { streamSectionRegenerate } from "@/lib/sse";
+import { downloadProjectFile } from "@/lib/projectFile";
 import type { SectionApproval, SectionState, SectionStatus } from "@/types/project";
 
 export default function DashboardPage() {
@@ -82,6 +83,10 @@ export default function DashboardPage() {
       }
     }
   };
+
+  const handleSaveProject = useCallback(() => {
+    downloadProjectFile(project);
+  }, [project]);
 
   const handleRegenerateSubmit = useCallback(
     (guidance: string) => {
@@ -166,7 +171,7 @@ export default function DashboardPage() {
           router.push(`/projects/${protocolId}/outline`);
         }}
       />
-      <ActionBar sections={project.sections} onApproveAll={handleApproveAll} />
+      <ActionBar sections={project.sections} onApproveAll={handleApproveAll} onSaveProject={handleSaveProject} />
       <main className="flex-1 px-4 py-6 sm:px-6">
         <div className="mx-auto max-w-7xl">
           {project.sections.length === 0 ? (
