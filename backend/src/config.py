@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     )
 
     llm_provider: str = "anthropic"
-    llm_model: str = "claude-sonnet-4-6-latest"
+    llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str | None = None
 
     qdrant_url: str = ""
