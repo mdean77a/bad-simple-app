@@ -10,14 +10,14 @@ import { SectionCard } from "@/components/dashboard/SectionCard";
 import { RegenerateModal } from "@/components/dashboard/RegenerateModal";
 import { useSectionStreaming } from "@/hooks/useSectionStreaming";
 import { streamSectionRegenerate } from "@/lib/sse";
-import type { SectionState, SectionStatus } from "@/types/project";
+import type { SectionApproval, SectionState, SectionStatus } from "@/types/project";
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { project, unconfirmOutline, updateSection } = useProject();
 
-  // Track previous status for cancel restoration
-  const prevStatusRef = useRef<Record<string, SectionStatus>>({});
+  // Track previous status and approval for cancel restoration
+  const prevStatusRef = useRef<Record<string, { status: SectionStatus; approval?: SectionApproval }>>({});
 
   // Regenerate modal state
   const [regenSection, setRegenSection] = useState<SectionState | null>(null);
@@ -40,9 +40,12 @@ export default function DashboardPage() {
   const handleEdit = (sectionId: string) => {
     const section = project.sections.find((s) => s.id === sectionId);
     if (section) {
-      prevStatusRef.current[sectionId] = section.status;
+      prevStatusRef.current[sectionId] = {
+        status: section.status,
+        approval: section.approval,
+      };
     }
-    updateSection(sectionId, { status: "editing" });
+    updateSection(sectionId, { status: "editing", approval: undefined });
   };
 
   const handleSave = (sectionId: string, newContent: string) => {
@@ -55,8 +58,11 @@ export default function DashboardPage() {
   };
 
   const handleCancel = (sectionId: string) => {
-    const previousStatus = prevStatusRef.current[sectionId] || "ready";
-    updateSection(sectionId, { status: previousStatus });
+    const prev = prevStatusRef.current[sectionId];
+    updateSection(sectionId, {
+      status: prev?.status || "ready",
+      approval: prev?.approval,
+    });
     delete prevStatusRef.current[sectionId];
   };
 
