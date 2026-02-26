@@ -92,8 +92,8 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: Project Persistence
-  epic-7: backlog
-  7-1-define-project-file-format-and-state-structure: backlog
+  epic-7: in-progress
+  7-1-define-project-file-format-and-state-structure: done
   7-2-implement-save-project-to-local-file: backlog
   7-3-implement-load-project-from-local-file: backlog
   7-4-wire-up-landing-page-project-actions: backlog
