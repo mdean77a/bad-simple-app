@@ -3,22 +3,31 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { useProject } from "@/lib/project";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ProtocolUpload } from "@/components/projects/ProtocolUpload";
 import { ProtocolSelect } from "@/components/projects/ProtocolSelect";
 
 export default function NewProjectPage() {
   const { user, isLoading } = useAuth();
+  const { setProtocol } = useProject();
   const router = useRouter();
   const [hasFileSelected, setHasFileSelected] = useState(false);
   const [uploadedProtocolId, setUploadedProtocolId] = useState<string | null>(
     null
   );
+  const [uploadedProtocolName, setUploadedProtocolName] = useState<string | null>(
+    null
+  );
   const [selectedProtocolId, setSelectedProtocolId] = useState<string | null>(
+    null
+  );
+  const [selectedProtocolName, setSelectedProtocolName] = useState<string | null>(
     null
   );
 
   const activeProtocolId = uploadedProtocolId || selectedProtocolId;
+  const activeProtocolName = uploadedProtocolName || selectedProtocolName;
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -26,13 +35,15 @@ export default function NewProjectPage() {
     }
   }, [isLoading, user, router]);
 
-  const handleUploadSuccess = useCallback((protocolId: string) => {
+  const handleUploadSuccess = useCallback((protocolId: string, protocolName: string) => {
     setUploadedProtocolId(protocolId);
+    setUploadedProtocolName(protocolName);
   }, []);
 
   const handleSelectionChange = useCallback(
-    (protocolId: string | null) => {
+    (protocolId: string | null, protocolName: string | null) => {
       setSelectedProtocolId(protocolId);
+      setSelectedProtocolName(protocolName);
     },
     []
   );
@@ -74,6 +85,7 @@ export default function NewProjectPage() {
             disabled={!activeProtocolId}
             onClick={() => {
               if (activeProtocolId) {
+                setProtocol(activeProtocolId, activeProtocolName ?? "");
                 router.push(
                   `/projects/${encodeURIComponent(activeProtocolId)}/outline`
                 );

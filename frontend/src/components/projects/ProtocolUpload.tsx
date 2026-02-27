@@ -13,7 +13,7 @@ type UploadState =
 interface ProtocolUploadProps {
   disabled?: boolean;
   onFileChange?: (hasFile: boolean) => void;
-  onUploadSuccess?: (protocolId: string) => void;
+  onUploadSuccess?: (protocolId: string, protocolName: string) => void;
 }
 
 export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: ProtocolUploadProps) {
@@ -41,7 +41,7 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
     try {
       const result = await uploadProtocol(selectedFile!, acronym.trim());
       setState({ status: "success", protocolName: result.protocolName });
-      onUploadSuccess?.(result.protocolId);
+      onUploadSuccess?.(result.protocolId, result.protocolName);
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -49,7 +49,7 @@ export function ProtocolUpload({ disabled, onFileChange, onUploadSuccess }: Prot
           : "An unexpected error occurred. Please try again.";
       setState({ status: "error", message });
     }
-  }, [selectedFile, acronym, validateAcronym]);
+  }, [selectedFile, acronym, validateAcronym, onUploadSuccess]);
 
   const handleFileSelected = useCallback(
     (file: File) => {

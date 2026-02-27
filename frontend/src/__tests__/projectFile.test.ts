@@ -6,6 +6,7 @@ import {
   extractExtraFields,
   sanitizeFilename,
   downloadProjectFile,
+  readProjectFile,
 } from "@/lib/projectFile";
 import type { ProjectState, SectionState } from "@/types/project";
 import type { ProjectFile } from "@/types/project";
@@ -367,6 +368,13 @@ describe("validateProjectFile", () => {
     expect(result.errors).toContain('Missing required field: "protocolName"');
   });
 
+  it("accepts empty string protocolName", () => {
+    const file = makeValidProjectFile({ protocolName: "" });
+    const result = validateProjectFile(file);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
   it("rejects missing sections", () => {
     const file = { ...makeValidProjectFile() };
     delete (file as Record<string, unknown>).sections;
@@ -648,6 +656,13 @@ describe("downloadProjectFile", () => {
     expect(capturedDownload).toBe("Study_Phase_12_ICF.json");
   });
 
+  it("falls back to protocolId for filename when protocolName is empty", () => {
+    const state = makeProjectState({ protocolName: "", protocolId: "protocol_diabetes_20260203" });
+    downloadProjectFile(state);
+
+    expect(capturedDownload).toBe("protocol_diabetes_20260203_ICF.json");
+  });
+
   it("sets href to the blob URL", () => {
     const state = makeProjectState();
     downloadProjectFile(state);
@@ -690,5 +705,80 @@ describe("downloadProjectFile", () => {
     expect(parsed.sections[1].status).toBe("ready");
 
     stringifySpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readProjectFile
+// ---------------------------------------------------------------------------
+
+function createMockFile(content: string, name = "test.json"): File {
+  const file = new File([content], name, { type: "application/json" });
+  Object.defineProperty(file, "text", {
+    value: () => Promise.resolve(content),
+  });
+  return file;
+}
+
+describe("readProjectFile", () => {
+  it("reads and deserializes a valid project file", async () => {
+    const projectFile = makeValidProjectFile();
+    const file = createMockFile(JSON.stringify(projectFile));
+
+    const result = await readProjectFile(file);
+
+    expect(result.project.protocolId).toBe("proto-abc");
+    expect(result.project.protocolName).toBe("Test Protocol");
+    expect(result.project.outline?.sections).toEqual(["Purpose", "Procedures"]);
+    expect(result.project.sections).toHaveLength(1);
+    expect(result.project.sections[0].name).toBe("Purpose");
+    expect(result.project.generatedOutline).toBeNull();
+    expect(result.warnings).toBeUndefined();
+  });
+
+  it("throws on invalid JSON content", async () => {
+    const file = createMockFile("this is not json");
+
+    await expect(readProjectFile(file)).rejects.toThrow(
+      "Invalid project file: not valid JSON"
+    );
+  });
+
+  it("throws on valid JSON but invalid structure (missing required fields)", async () => {
+    const file = createMockFile(JSON.stringify({ foo: "bar" }));
+
+    await expect(readProjectFile(file)).rejects.toThrow(
+      "Invalid project file:"
+    );
+  });
+
+  it("throws with specific validation errors in message", async () => {
+    const file = createMockFile(
+      JSON.stringify({ version: "1.0", protocolId: "p1", sections: "not-array" })
+    );
+
+    await expect(readProjectFile(file)).rejects.toThrow(
+      '"sections" must be an array'
+    );
+  });
+
+  it("returns warnings for unrecognized version but still loads", async () => {
+    const projectFile = makeValidProjectFile({ version: "99.0" });
+    const file = createMockFile(JSON.stringify(projectFile));
+
+    const result = await readProjectFile(file);
+
+    expect(result.project.protocolId).toBe("proto-abc");
+    expect(result.warnings).toBeDefined();
+    expect(result.warnings![0]).toContain('Unrecognized version "99.0"');
+  });
+
+  it("returns no warnings for current version", async () => {
+    const projectFile = makeValidProjectFile();
+    const file = createMockFile(JSON.stringify(projectFile));
+
+    const result = await readProjectFile(file);
+
+    expect(result.warnings).toBeUndefined();
   });
 });

@@ -38,6 +38,8 @@ type ProjectAction =
       type: "UPDATE_SECTION";
       payload: { id: string; updates: Partial<SectionState> };
     }
+  | { type: "SET_PROTOCOL"; payload: { protocolId: string; protocolName: string } }
+  | { type: "LOAD_PROJECT"; payload: ProjectState }
   | { type: "UNCONFIRM_OUTLINE" }
   | { type: "RESET" };
 
@@ -87,6 +89,14 @@ function projectReducer(
             : s
         ),
       };
+    case "SET_PROTOCOL":
+      return {
+        ...state,
+        protocolId: action.payload.protocolId,
+        protocolName: action.payload.protocolName,
+      };
+    case "LOAD_PROJECT":
+      return action.payload;
     case "UNCONFIRM_OUTLINE":
       return {
         ...state,
@@ -102,6 +112,7 @@ function projectReducer(
 
 interface ProjectContextType {
   project: ProjectState;
+  setProtocol: (protocolId: string, protocolName: string) => void;
   confirmOutline: (
     protocolId: string,
     outline: ConfirmedOutline,
@@ -112,6 +123,7 @@ interface ProjectContextType {
     sections: OutlineSection[],
     checkedState: Record<string, boolean>
   ) => void;
+  loadProject: (state: ProjectState) => void;
   updateSection: (id: string, updates: Partial<SectionState>) => void;
   updateCheckedState: (checkedState: Record<string, boolean>) => void;
   unconfirmOutline: () => void;
@@ -123,6 +135,10 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [project, dispatch] = useReducer(projectReducer, initialState);
 
+  const setProtocol = (protocolId: string, protocolName: string) => {
+    dispatch({ type: "SET_PROTOCOL", payload: { protocolId, protocolName } });
+  };
+
   const confirmOutline = (
     protocolId: string,
     outline: ConfirmedOutline,
@@ -132,6 +148,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       type: "CONFIRM_OUTLINE",
       payload: { protocolId, outline, sections },
     });
+  };
+
+  const loadProject = (state: ProjectState) => {
+    dispatch({ type: "LOAD_PROJECT", payload: state });
   };
 
   const updateSection = (id: string, updates: Partial<SectionState>) => {
@@ -165,7 +185,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     <ProjectContext.Provider
       value={{
         project,
+        setProtocol,
         confirmOutline,
+        loadProject,
         updateSection,
         cacheGeneratedOutline,
         updateCheckedState,

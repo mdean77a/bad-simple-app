@@ -10,7 +10,7 @@ type LoadState =
 
 interface ProtocolSelectProps {
   disabled?: boolean;
-  onSelectionChange?: (protocolId: string | null) => void;
+  onSelectionChange?: (protocolId: string | null, protocolName: string | null) => void;
 }
 
 export function ProtocolSelect({
@@ -54,10 +54,10 @@ export function ProtocolSelect({
   }, []);
 
   const handleSelect = useCallback(
-    (protocolId: string) => {
+    (protocolId: string, protocolName: string) => {
       setSelectedId(protocolId);
       setOpen(false);
-      onSelectionChange?.(protocolId || null);
+      onSelectionChange?.(protocolId || null, protocolName || null);
     },
     [onSelectionChange]
   );
@@ -146,7 +146,7 @@ export function ProtocolSelect({
               key={protocol.protocolId}
               role="option"
               aria-selected={protocol.protocolId === selectedId}
-              onClick={() => handleSelect(protocol.protocolId)}
+              onClick={() => handleSelect(protocol.protocolId, protocol.protocolName)}
               className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-violet-50 ${
                 protocol.protocolId === selectedId ? "bg-violet-50" : ""
               }`}
