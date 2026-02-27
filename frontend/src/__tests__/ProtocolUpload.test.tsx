@@ -585,6 +585,6 @@ describe("ProtocolUpload", () => {
     );
 
     await screen.findByText("Protocol uploaded successfully");
-    expect(onUploadSuccess).toHaveBeenCalledWith("protocol_test_123");
+    expect(onUploadSuccess).toHaveBeenCalledWith("protocol_test_123", "My Protocol");
   });
 });

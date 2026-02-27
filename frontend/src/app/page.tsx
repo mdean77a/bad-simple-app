@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { useProject } from "@/lib/project";
+import { readProjectFile } from "@/lib/projectFile";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { checkHealth } from "@/lib/api";
@@ -65,6 +68,40 @@ function BackendStatus() {
 
 function AuthenticatedLandingPage() {
   const { user } = useAuth();
+  const { loadProject } = useProject();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoadError(null);
+
+    try {
+      const { project, warnings } = await readProjectFile(file);
+
+      if (warnings?.length) {
+        window.alert(warnings.join("\n"));
+      }
+
+      loadProject(project);
+
+      if (project.outline) {
+        router.push(`/projects/${encodeURIComponent(project.protocolId)}`);
+      } else {
+        router.push(`/projects/${encodeURIComponent(project.protocolId)}/outline`);
+      }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Invalid project file");
+    } finally {
+      // Reset so the same file can be re-selected
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -99,9 +136,8 @@ function AuthenticatedLandingPage() {
               New Project
             </Link>
             <button
-              disabled
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-4 font-medium text-slate-700 opacity-50 cursor-not-allowed"
-              aria-disabled="true"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-4 font-medium text-slate-700 hover:bg-slate-50"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -113,10 +149,20 @@ function AuthenticatedLandingPage() {
               </svg>
               Continue Saved Project
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleFileSelect}
+              data-testid="file-input"
+            />
           </div>
-          <p className="text-center text-sm text-slate-500">
-            Continue Saved Project will be enabled in a later version.
-          </p>
+          {loadError && (
+            <p className="text-center text-sm text-red-600" role="alert">
+              {loadError}
+            </p>
+          )}
           <div className="flex justify-center">
             <BackendStatus />
           </div>

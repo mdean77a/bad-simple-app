@@ -142,7 +142,8 @@ describe("ProtocolSelect", () => {
     fireEvent.click(options[0]);
 
     expect(onSelectionChange).toHaveBeenCalledWith(
-      "protocol_diabetes_20260203"
+      "protocol_diabetes_20260203",
+      "Diabetes Study"
     );
   });
 

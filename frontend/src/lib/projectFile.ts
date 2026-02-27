@@ -36,7 +36,7 @@ export function downloadProjectFile(
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${sanitizeFilename(project.protocolName)}_ICF.json`;
+  a.download = `${sanitizeFilename(project.protocolName || project.protocolId)}_ICF.json`;
   document.body.appendChild(a);
   a.click();
 
@@ -153,6 +153,36 @@ export function deserializeProject(file: ProjectFile): ProjectState {
   };
 }
 
+/**
+ * Reads a File object, parses JSON, validates, and deserializes to ProjectState.
+ * Throws on invalid JSON or validation failure. Returns warnings for version mismatch.
+ */
+export async function readProjectFile(
+  file: File
+): Promise<{ project: ProjectState; warnings?: string[] }> {
+  const text = await file.text();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Invalid project file: not valid JSON");
+  }
+
+  const validation = validateProjectFile(parsed);
+  if (!validation.valid) {
+    throw new Error(
+      `Invalid project file: ${validation.errors.join("; ")}`
+    );
+  }
+
+  const project = deserializeProject(parsed as ProjectFile);
+  return {
+    project,
+    ...(validation.warnings?.length ? { warnings: validation.warnings } : {}),
+  };
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
@@ -184,7 +214,7 @@ export function validateProjectFile(
   if (!obj.protocolId || typeof obj.protocolId !== "string") {
     errors.push('Missing required field: "protocolId"');
   }
-  if (!obj.protocolName || typeof obj.protocolName !== "string") {
+  if (typeof obj.protocolName !== "string") {
     errors.push('Missing required field: "protocolName"');
   }
   if (!("sections" in obj)) {

@@ -22,10 +22,14 @@ const mockGeneratedSections: OutlineSection[] = [
   },
 ];
 
+import type { ProjectState } from "@/types/project";
+
 function TestConsumer() {
   const {
     project,
+    setProtocol,
     confirmOutline,
+    loadProject,
     updateSection,
     cacheGeneratedOutline,
     updateCheckedState,
@@ -36,6 +40,7 @@ function TestConsumer() {
     <div>
       <p data-testid="has-outline">{project.outline ? "yes" : "no"}</p>
       <p data-testid="protocol-id">{project.protocolId}</p>
+      <p data-testid="protocol-name">{project.protocolName}</p>
       <p data-testid="section-count">{project.sections.length}</p>
       <p data-testid="has-generated">
         {project.generatedOutline ? "yes" : "no"}
@@ -110,6 +115,42 @@ function TestConsumer() {
       </button>
       <button onClick={unconfirmOutline}>Unconfirm</button>
       <button onClick={resetProject}>Reset</button>
+      <button
+        onClick={() => setProtocol("proto-abc", "Test Protocol Name")}
+      >
+        SetProtocol
+      </button>
+      <button
+        onClick={() => {
+          const loaded: ProjectState = {
+            protocolId: "loaded-proto",
+            protocolName: "Loaded Protocol",
+            outline: {
+              sections: ["Background"],
+              confirmedAt: "2026-02-01T00:00:00Z",
+              confirmedBy: { name: "Loader", email: "loader@test.com" },
+            },
+            sections: [
+              {
+                id: "loaded-1",
+                name: "Background",
+                content: "Loaded content",
+                status: "approved",
+                originalPrompt: "prompt",
+                approval: {
+                  userName: "Loader",
+                  userEmail: "loader@test.com",
+                  timestamp: "2026-02-01T00:00:00Z",
+                },
+              },
+            ],
+            generatedOutline: null,
+          };
+          loadProject(loaded);
+        }}
+      >
+        LoadProject
+      </button>
     </div>
   );
 }
@@ -244,6 +285,58 @@ describe("ProjectContext", () => {
 
     expect(screen.getByTestId("has-generated")).toHaveTextContent("no");
     expect(screen.getByTestId("checked-state")).toHaveTextContent("null");
+  });
+
+  it("sets protocolId and protocolName on setProtocol", async () => {
+    render(
+      <ProjectProvider>
+        <TestConsumer />
+      </ProjectProvider>
+    );
+
+    await userEvent.click(screen.getByText("SetProtocol"));
+
+    expect(screen.getByTestId("protocol-id")).toHaveTextContent("proto-abc");
+    expect(screen.getByTestId("protocol-name")).toHaveTextContent("Test Protocol Name");
+  });
+
+  it("preserves protocolName through confirmOutline", async () => {
+    render(
+      <ProjectProvider>
+        <TestConsumer />
+      </ProjectProvider>
+    );
+
+    // First set protocol name
+    await userEvent.click(screen.getByText("SetProtocol"));
+    expect(screen.getByTestId("protocol-name")).toHaveTextContent("Test Protocol Name");
+
+    // Then confirm outline (which uses ...state spread, preserving protocolName)
+    await userEvent.click(screen.getByText("Confirm"));
+    expect(screen.getByTestId("protocol-name")).toHaveTextContent("Test Protocol Name");
+  });
+
+  it("replaces entire project state on loadProject", async () => {
+    render(
+      <ProjectProvider>
+        <TestConsumer />
+      </ProjectProvider>
+    );
+
+    // First confirm something so there's existing state
+    await userEvent.click(screen.getByText("Confirm"));
+    expect(screen.getByTestId("protocol-id")).toHaveTextContent("proto-123");
+    expect(screen.getByTestId("section-count")).toHaveTextContent("2");
+
+    // Now load a completely different project
+    await userEvent.click(screen.getByText("LoadProject"));
+
+    expect(screen.getByTestId("protocol-id")).toHaveTextContent("loaded-proto");
+    expect(screen.getByTestId("has-outline")).toHaveTextContent("yes");
+    expect(screen.getByTestId("section-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("confirmed-by")).toHaveTextContent("Loader");
+    expect(screen.getByTestId("section-names")).toHaveTextContent("Background");
+    expect(screen.getByTestId("section-Background")).toHaveTextContent("approved");
   });
 
   it("throws error when useProject is used outside ProjectProvider", () => {

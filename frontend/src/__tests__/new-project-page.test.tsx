@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import NewProjectPage from "@/app/projects/new/page";
 import { AuthProvider } from "@/lib/auth";
+import { ProjectProvider } from "@/lib/project";
 import * as api from "@/lib/api";
 
 const mockPush = jest.fn();
@@ -33,7 +34,9 @@ const mockUploadProtocol = api.uploadProtocol as jest.MockedFunction<
 const renderPage = () => {
   return render(
     <AuthProvider>
-      <NewProjectPage />
+      <ProjectProvider>
+        <NewProjectPage />
+      </ProjectProvider>
     </AuthProvider>
   );
 };
