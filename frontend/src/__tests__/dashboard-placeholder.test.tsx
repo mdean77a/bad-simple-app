@@ -19,6 +19,11 @@ jest.mock("@/lib/projectFile", () => ({
   downloadProjectFile: jest.fn(),
 }));
 
+jest.mock("@/lib/api", () => ({
+  ...jest.requireActual("@/lib/api"),
+  exportDocument: jest.fn(),
+}));
+
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 
@@ -688,6 +693,85 @@ describe("Dashboard Page", () => {
         ]),
       })
     );
+  });
+
+  // --- Export integration tests ---
+
+  it("clicking PDF export calls exportDocument with correct args and shows success toast", async () => {
+    const { exportDocument } = require("@/lib/api");
+    const fakeBlob = new Blob(["%PDF-fake"], { type: "application/pdf" });
+    exportDocument.mockResolvedValue(fakeBlob);
+
+    // Mock download helpers (non-destructive — doesn't interfere with React DOM)
+    global.URL.createObjectURL = jest.fn().mockReturnValue("blob:fake-url");
+    global.URL.revokeObjectURL = jest.fn();
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const approvedSections: SectionState[] = [
+      {
+        id: "uuid-1",
+        name: "Purpose of the Study",
+        content: "Study purpose content.",
+        status: "approved",
+        originalPrompt: "",
+        approval: { userName: "Jane", userEmail: "jane@example.com", timestamp: "2026-02-03T14:30:00Z" },
+      },
+    ];
+    renderWithSections(approvedSections);
+
+    const pdfBtn = await screen.findByRole("button", { name: /export as pdf/i });
+    await userEvent.click(pdfBtn);
+
+    await waitFor(() => {
+      expect(exportDocument).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "uuid-1", name: "Purpose of the Study" }),
+        ]),
+        expect.arrayContaining([
+          expect.objectContaining({ sectionId: "uuid-1", userName: "Jane" }),
+        ]),
+        "pdf",
+        expect.any(String),
+      );
+    });
+
+    // Success toast
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(/Downloaded.*_ICF\.pdf/);
+    });
+  });
+
+  it("shows error toast when export fails", async () => {
+    const { exportDocument } = require("@/lib/api");
+    exportDocument.mockRejectedValue(new Error("Server error"));
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const approvedSections: SectionState[] = [
+      {
+        id: "uuid-1",
+        name: "Purpose",
+        content: "Content.",
+        status: "approved",
+        originalPrompt: "",
+        approval: { userName: "Jane", userEmail: "jane@example.com", timestamp: "2026-02-03T14:30:00Z" },
+      },
+    ];
+    renderWithSections(approvedSections);
+
+    const pdfBtn = await screen.findByRole("button", { name: /export as pdf/i });
+    await userEvent.click(pdfBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Server error");
+    });
   });
 
   it("saving edits to an approved section clears approval and sets status to edited", async () => {

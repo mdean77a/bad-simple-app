@@ -82,6 +82,49 @@ export async function generateOutline(
   return response.json();
 }
 
+export type ExportFormat = "md" | "pdf" | "docx";
+
+export interface ExportSection {
+  id: string;
+  name: string;
+  content: string;
+}
+
+export interface ExportApproval {
+  sectionId: string;
+  userName: string;
+  userEmail: string;
+  timestamp: string;
+}
+
+export async function exportDocument(
+  sections: ExportSection[],
+  approvals: ExportApproval[],
+  format: ExportFormat,
+  protocolName: string,
+): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/export/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sections, approvals, format, protocolName }),
+  });
+
+  if (!response.ok) {
+    let body: { code?: string; detail?: string };
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error(`Export failed: ${response.status}`);
+    }
+    throw new ApiError(
+      body.code || "UNKNOWN_ERROR",
+      body.detail || "Export failed",
+    );
+  }
+
+  return response.blob();
+}
+
 export async function uploadProtocol(
   file: File,
   acronym: string

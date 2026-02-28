@@ -83,17 +83,14 @@ def _format_timestamp(iso_timestamp: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# PDF conversion (weasyprint – lazy-imported for testability)
+# PDF conversion (xhtml2pdf – pure Python, no system dependencies)
 # ---------------------------------------------------------------------------
 
 _PDF_CSS = """\
 body {
-    font-family: serif;
+    font-family: Helvetica, serif;
     font-size: 12pt;
     line-height: 1.6;
-    max-width: 7in;
-    margin: 0 auto;
-    padding: 0.5in;
 }
 h1 {
     text-align: center;
@@ -133,11 +130,11 @@ hr {
 def convert_markdown_to_pdf(md_content: str) -> bytes:
     """Convert Markdown content to PDF bytes."""
     try:
-        import markdown as md_lib  # noqa: F811
-        from weasyprint import HTML
+        import markdown as md_lib
+        from xhtml2pdf import pisa
     except ImportError as exc:
         raise ExportError(
-            f"PDF export requires weasyprint and markdown packages: {exc}"
+            f"PDF export requires xhtml2pdf and markdown packages: {exc}"
         ) from exc
 
     try:
@@ -151,7 +148,13 @@ def convert_markdown_to_pdf(md_content: str) -> bytes:
             f"<style>{_PDF_CSS}</style>"
             f"</head><body>{html_body}</body></html>"
         )
-        return HTML(string=html_doc).write_pdf()
+        buf = io.BytesIO()
+        status = pisa.CreatePDF(html_doc, dest=buf)
+        if status.err:
+            raise ExportError("PDF conversion returned errors")
+        return buf.getvalue()
+    except ExportError:
+        raise
     except Exception as exc:
         raise ExportError(f"PDF conversion failed: {exc}") from exc
 

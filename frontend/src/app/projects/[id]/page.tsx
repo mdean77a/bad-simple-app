@@ -9,6 +9,8 @@ import { ActionBar } from "@/components/dashboard/ActionBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { RegenerateModal } from "@/components/dashboard/RegenerateModal";
 import { useSectionStreaming } from "@/hooks/useSectionStreaming";
+import { exportDocument } from "@/lib/api";
+import type { ExportFormat } from "@/lib/api";
 import { streamSectionRegenerate } from "@/lib/sse";
 import { downloadProjectFile } from "@/lib/projectFile";
 import type { SectionApproval, SectionState, SectionStatus } from "@/types/project";
@@ -87,6 +89,54 @@ export default function DashboardPage() {
   const handleSaveProject = useCallback(() => {
     downloadProjectFile(project);
   }, [project]);
+
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      const protocolName = project.protocolName || project.protocolId;
+      const sections = project.sections.map((s) => ({
+        id: s.id,
+        name: s.name,
+        content: s.content,
+      }));
+      const approvals = project.sections
+        .filter((s) => s.approval)
+        .map((s) => ({
+          sectionId: s.id,
+          userName: s.approval!.userName,
+          userEmail: s.approval!.userEmail,
+          timestamp: s.approval!.timestamp,
+        }));
+
+      const filename = `${protocolName}_ICF.${format}`;
+
+      try {
+        const blob = await exportDocument(sections, approvals, format, protocolName);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setToast({ message: `Downloaded ${filename}`, type: "success" });
+      } catch (err) {
+        setToast({
+          message: err instanceof Error ? err.message : "Export failed",
+          type: "error",
+        });
+      }
+    },
+    [project],
+  );
 
   const handleRegenerateSubmit = useCallback(
     (guidance: string) => {
@@ -171,7 +221,7 @@ export default function DashboardPage() {
           router.push(`/projects/${protocolId}/outline`);
         }}
       />
-      <ActionBar sections={project.sections} onApproveAll={handleApproveAll} onSaveProject={handleSaveProject} />
+      <ActionBar sections={project.sections} onApproveAll={handleApproveAll} onSaveProject={handleSaveProject} onExport={handleExport} />
       <main className="flex-1 px-4 py-6 sm:px-6">
         <div className="mx-auto max-w-7xl">
           {project.sections.length === 0 ? (
@@ -203,6 +253,16 @@ export default function DashboardPage() {
         onClose={() => setRegenSection(null)}
         onSubmit={handleRegenerateSubmit}
       />
+      {toast && (
+        <div
+          className={`fixed bottom-4 right-4 z-50 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+            toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
+          }`}
+          role="status"
+        >
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
