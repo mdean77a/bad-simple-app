@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ActionBar } from "@/components/dashboard/ActionBar";
 import type { SectionState } from "@/types/project";
@@ -200,6 +200,66 @@ describe("ActionBar", () => {
     expect(screen.getByRole("button", { name: /export as pdf/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /export as word/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /export as markdown/i })).toBeDisabled();
+  });
+
+  it("calls onExport with 'pdf' when PDF button is clicked", async () => {
+    const onExport = jest.fn().mockResolvedValue(undefined);
+    const sections = [
+      makeSection({ id: "s1", status: "approved" }),
+      makeSection({ id: "s2", status: "approved" }),
+    ];
+    render(<ActionBar sections={sections} onExport={onExport} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /export as pdf/i }));
+
+    expect(onExport).toHaveBeenCalledWith("pdf");
+  });
+
+  it("calls onExport with 'docx' when Word button is clicked", async () => {
+    const onExport = jest.fn().mockResolvedValue(undefined);
+    const sections = [
+      makeSection({ id: "s1", status: "approved" }),
+      makeSection({ id: "s2", status: "approved" }),
+    ];
+    render(<ActionBar sections={sections} onExport={onExport} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /export as word/i }));
+
+    expect(onExport).toHaveBeenCalledWith("docx");
+  });
+
+  it("calls onExport with 'md' when Markdown button is clicked", async () => {
+    const onExport = jest.fn().mockResolvedValue(undefined);
+    const sections = [
+      makeSection({ id: "s1", status: "approved" }),
+      makeSection({ id: "s2", status: "approved" }),
+    ];
+    render(<ActionBar sections={sections} onExport={onExport} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /export as markdown/i }));
+
+    expect(onExport).toHaveBeenCalledWith("md");
+  });
+
+  it("shows loading aria-label while exporting", async () => {
+    let resolveExport: () => void;
+    const onExport = jest.fn().mockReturnValue(
+      new Promise<void>((resolve) => { resolveExport = resolve; })
+    );
+    const sections = [
+      makeSection({ id: "s1", status: "approved" }),
+    ];
+    const { unmount } = render(<ActionBar sections={sections} onExport={onExport} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /export as pdf/i }));
+
+    expect(screen.getByRole("button", { name: /exporting pdf/i })).toBeInTheDocument();
+
+    // Resolve and unmount to avoid act() warning from state update after unmount
+    await act(async () => {
+      resolveExport!();
+    });
+    unmount();
   });
 
   // --- Save Project button ---

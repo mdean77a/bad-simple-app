@@ -1,4 +1,4 @@
-import { checkHealth, uploadProtocol, fetchProtocols, generateOutline, ApiError, API_BASE_URL } from "@/lib/api";
+import { checkHealth, uploadProtocol, fetchProtocols, generateOutline, exportDocument, ApiError, API_BASE_URL } from "@/lib/api";
 
 describe("API_BASE_URL", () => {
   it("defaults to localhost:8000 when env var is not set", () => {
@@ -260,6 +260,72 @@ describe("generateOutline", () => {
 
     await expect(generateOutline("protocol_test_123")).rejects.toThrow(
       "Failed to fetch"
+    );
+  });
+});
+
+describe("exportDocument", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  const sections = [
+    { id: "s1", name: "Purpose", content: "Study purpose." },
+  ];
+  const approvals = [
+    { sectionId: "s1", userName: "Jane", userEmail: "jane@example.com", timestamp: "2026-02-03T10:00:00Z" },
+  ];
+
+  it("sends POST with sections, approvals, format, and protocolName", async () => {
+    const fakeBlob = new Blob(["# MD content"], { type: "text/markdown" });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    const result = await exportDocument(sections, approvals, "md", "THAPCA");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API_BASE_URL}/api/v1/export/`,
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sections,
+          approvals,
+          format: "md",
+          protocolName: "THAPCA",
+        }),
+      })
+    );
+    expect(result).toBe(fakeBlob);
+  });
+
+  it("throws ApiError on API error with structured body", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.resolve({ code: "EXPORT_ERROR", detail: "PDF failed" }),
+    });
+
+    await expect(exportDocument(sections, approvals, "pdf", "THAPCA")).rejects.toThrow(ApiError);
+    try {
+      await exportDocument(sections, approvals, "pdf", "THAPCA");
+    } catch (err) {
+      expect((err as ApiError).code).toBe("EXPORT_ERROR");
+      expect((err as ApiError).detail).toBe("PDF failed");
+    }
+  });
+
+  it("throws generic Error when response body is not JSON", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.reject(new SyntaxError("Unexpected token")),
+    });
+
+    await expect(exportDocument(sections, approvals, "docx", "THAPCA")).rejects.toThrow(
+      "Export failed: 500"
     );
   });
 });
