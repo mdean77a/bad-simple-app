@@ -2,6 +2,7 @@
 
 import io
 import re
+from datetime import datetime
 
 
 class ExportError(Exception):
@@ -30,6 +31,55 @@ def assemble_markdown(
         parts.append("")
 
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Approval tracking page
+# ---------------------------------------------------------------------------
+
+
+def build_approval_tracking(
+    approvals: list[dict[str, str]],
+    sections: list[dict[str, str]],
+) -> str:
+    """Build an approval tracking Markdown section.
+
+    Returns an empty string when *approvals* is empty.
+    Each approval dict must have ``sectionId``, ``userName``, ``timestamp``.
+    Each section dict must have ``id`` and ``name``.
+    """
+    if not approvals:
+        return ""
+
+    section_names: dict[str, str] = {s["id"]: s["name"] for s in sections}
+
+    rows: list[str] = []
+    for a in approvals:
+        name = section_names.get(a["sectionId"], a["sectionId"])
+        ts = _format_timestamp(a["timestamp"])
+        rows.append(f"| {name} | {a['userName']} | {ts} |")
+
+    lines = [
+        "---",
+        "",
+        "## Approval Tracking",
+        "",
+        "| Section | Approved By | Date & Time |",
+        "|---------|-------------|-------------|",
+        *rows,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _format_timestamp(iso_timestamp: str) -> str:
+    """Format an ISO-8601 timestamp as ``Feb 3, 2026 at 2:30 PM``."""
+    dt = datetime.fromisoformat(iso_timestamp)
+    month = dt.strftime("%b")
+    day = dt.day
+    year = dt.year
+    time_str = dt.strftime("%I:%M %p").lstrip("0")
+    return f"{month} {day}, {year} at {time_str}"
 
 
 # ---------------------------------------------------------------------------

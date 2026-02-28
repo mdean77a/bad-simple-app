@@ -9,7 +9,9 @@ from src.services.export_service import (
     ExportError,
     _add_runs,
     _build_docx,
+    _format_timestamp,
     assemble_markdown,
+    build_approval_tracking,
     convert_markdown_to_docx,
 )
 
@@ -96,6 +98,68 @@ class TestAssembleMarkdown:
         sections = [{"id": "s1", "name": "Empty", "content": ""}]
         result = assemble_markdown(sections, "P")
         assert "## Empty" in result
+
+
+# ===================================================================
+# build_approval_tracking / _format_timestamp – unit tests
+# ===================================================================
+
+
+class TestFormatTimestamp:
+    def test_basic(self):
+        assert _format_timestamp("2026-02-03T14:30:00Z") == "Feb 3, 2026 at 2:30 PM"
+
+    def test_morning(self):
+        assert _format_timestamp("2026-02-03T09:05:00Z") == "Feb 3, 2026 at 9:05 AM"
+
+    def test_noon(self):
+        assert _format_timestamp("2026-12-25T12:00:00Z") == "Dec 25, 2026 at 12:00 PM"
+
+    def test_midnight(self):
+        assert _format_timestamp("2026-01-01T00:00:00Z") == "Jan 1, 2026 at 12:00 AM"
+
+    def test_with_offset(self):
+        result = _format_timestamp("2026-02-03T14:30:00+05:00")
+        assert "Feb 3, 2026" in result
+        assert "2:30 PM" in result
+
+
+class TestBuildApprovalTracking:
+    def test_basic_table(self):
+        result = build_approval_tracking(_APPROVALS, _SECTIONS)
+        assert "## Approval Tracking" in result
+        assert "| Section | Approved By | Date & Time |" in result
+        assert "| Purpose of the Study | Sarah Johnson | Feb 3, 2026 at 2:30 PM |" in result
+        assert "| Study Procedures | Sarah Johnson | Feb 3, 2026 at 2:35 PM |" in result
+
+    def test_empty_approvals_returns_empty(self):
+        assert build_approval_tracking([], _SECTIONS) == ""
+
+    def test_starts_with_horizontal_rule(self):
+        result = build_approval_tracking(_APPROVALS, _SECTIONS)
+        assert result.startswith("---")
+
+    def test_unknown_section_id_uses_id_as_fallback(self):
+        approvals = [
+            {"sectionId": "unknown-id", "userName": "Jane", "timestamp": "2026-01-01T10:00:00Z"},
+        ]
+        result = build_approval_tracking(approvals, _SECTIONS)
+        assert "| unknown-id | Jane |" in result
+
+    def test_multiple_approvers(self):
+        approvals = [
+            {"sectionId": "purpose", "userName": "Sarah Johnson", "timestamp": "2026-02-03T14:30:00Z"},
+            {"sectionId": "procedures", "userName": "Maria Chen", "timestamp": "2026-02-04T10:15:00Z"},
+        ]
+        result = build_approval_tracking(approvals, _SECTIONS)
+        assert "Sarah Johnson" in result
+        assert "Maria Chen" in result
+
+    def test_preserves_section_order(self):
+        result = build_approval_tracking(_APPROVALS, _SECTIONS)
+        purpose_pos = result.index("Purpose of the Study")
+        procedures_pos = result.index("Study Procedures")
+        assert purpose_pos < procedures_pos
 
 
 # ===================================================================
@@ -371,21 +435,43 @@ class TestExportRoute:
         )
         assert 'filename="Spaced_ICF.md"' in response.headers["content-disposition"]
 
-    # --- Approvals accepted but not rendered in 8.1 ---
+    # --- Approval tracking in export ---
 
     @pytest.mark.asyncio
-    async def test_approvals_accepted_in_request(self, client):
-        """Approvals are accepted in the request (for Story 8.2) but not rendered yet."""
+    async def test_markdown_includes_approval_tracking(self, client):
         response = await client.post(
             "/api/v1/export/",
             json=_export_body(approvals=_APPROVALS, fmt="md"),
         )
-        assert response.status_code == 200
+        text = response.text
+        assert "## Approval Tracking" in text
+        assert "Sarah Johnson" in text
+        assert "Feb 3, 2026 at 2:30 PM" in text
 
     @pytest.mark.asyncio
-    async def test_empty_approvals_accepted(self, client):
+    async def test_approval_tracking_after_sections(self, client):
+        response = await client.post(
+            "/api/v1/export/",
+            json=_export_body(fmt="md"),
+        )
+        text = response.text
+        last_section_pos = text.index("Study Procedures")
+        tracking_pos = text.index("Approval Tracking")
+        assert tracking_pos > last_section_pos
+
+    @pytest.mark.asyncio
+    async def test_no_approval_tracking_when_empty(self, client):
         response = await client.post(
             "/api/v1/export/",
             json=_export_body(approvals=[], fmt="md"),
         )
-        assert response.status_code == 200
+        assert "Approval Tracking" not in response.text
+
+    @pytest.mark.asyncio
+    @patch("src.api.routes.export.convert_markdown_to_pdf")
+    async def test_pdf_receives_approval_tracking(self, mock_pdf, client):
+        mock_pdf.return_value = b"%PDF"
+        await client.post("/api/v1/export/", json=_export_body(fmt="pdf"))
+        md_arg = mock_pdf.call_args[0][0]
+        assert "## Approval Tracking" in md_arg
+        assert "Sarah Johnson" in md_arg
