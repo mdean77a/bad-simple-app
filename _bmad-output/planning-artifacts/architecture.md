@@ -180,7 +180,7 @@ npx create-next-app@latest frontend --typescript --tailwind --eslint --app --src
 - `pymupdf` — PDF processing
 - `pydantic-settings` — Configuration
 
-**Note:** No database dependencies (no SQLAlchemy, no psycopg2). Export format libraries (`python-docx`, `weasyprint`, `markdown`) not yet installed — will be added in Epic 8. Ollama provider (`langchain-ollama`) was not included in MVP.
+**Note:** No database dependencies (no SQLAlchemy, no psycopg2). Export format libraries installed: `python-docx` (DOCX), `xhtml2pdf` (PDF, pure Python replacement for weasyprint), `markdown` (Markdown→HTML for PDF pipeline). Ollama provider (`langchain-ollama`) was not included in MVP.
 
 ### Configuration: Configurable LLM Provider
 
@@ -388,7 +388,7 @@ settings = Settings()
 | POST | `/api/v1/outline/generate` | Generate outline from protocol ID; returns proposed section checklist |
 | POST | `/api/v1/sections/generate` | SSE stream - generate all sections in parallel; body: `{protocolId, sections: [{id, name}, ...]}` |
 | POST | `/api/v1/sections/regenerate` | SSE stream - regenerate one section; body: `{protocolId, sectionId, sectionName, currentContent, guidance?}` |
-| POST | `/api/v1/export` | _(Not yet implemented — Epic 8 backlog)_ |
+| POST | `/api/v1/export` | Generate export document; body: `{sections: [...], approvals: [...], format: "md"\|"pdf"\|"docx", protocolName: string}`; returns file with Content-Disposition |
 
 **Frontend-Only Operations (no backend call):**
 
@@ -578,7 +578,7 @@ src/services/
 └── vector_store.py           # Qdrant operations (index, search, list)
 ```
 
-**Note:** The planned `llm/` subdirectory with per-provider modules was simplified to a single `llm_factory.py` file. The planned `project_state.py` and `export_service.py` are not yet implemented (project state is frontend-only; export is Epic 8 backlog).
+**Note:** The planned `llm/` subdirectory with per-provider modules was simplified to a single `llm_factory.py` file. The planned `project_state.py` is not implemented (project state is frontend-only). `export_service.py` is implemented with programmatic document assembly (no LLM polishing), xhtml2pdf for PDF, python-docx for DOCX, and lazy imports for deployment flexibility.
 
 ### API Response Patterns
 
@@ -964,7 +964,7 @@ bmad-simple-app/
 | `/api/v1/protocols/*` | PDF upload, text extraction, vector indexing, list indexed protocols |
 | `/api/v1/outline/*` | Generate ICF outline from protocol |
 | `/api/v1/sections/*` | Generate sections (SSE), regenerate with guidance (SSE) |
-| `/api/v1/export` | Generate document (LLM→Markdown→PDF/Word) from frontend content |
+| `/api/v1/export` | Generate export document (Markdown→PDF/DOCX) with approval tracking page |
 
 **Service Boundaries:**
 
@@ -1051,7 +1051,7 @@ All architectural decisions work together without conflicts:
 | Sections (FR16-24) | ✅ | Dashboard components, SSE streaming, state machine |
 | Projects (FR25, FR27, FR29-30) | ✅ | Frontend-only: React state, local file save/load |
 | Approvals (FR31-34, FR35a) | ✅ | Approval tracking in project state, approve-all endpoint |
-| Export (FR35-39) | ✅ | Export service (LLM→Markdown→PDF/Word), export button |
+| Export (FR35-39) | ✅ | Export service (programmatic Markdown assembly→xhtml2pdf/python-docx), ActionBar export buttons with blob download |
 | UI (FR40-43) | ✅ | Tailwind responsive, three breakpoints defined |
 
 **Non-Functional Requirements:**

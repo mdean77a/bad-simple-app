@@ -350,7 +350,7 @@ This document provides the complete epic and story breakdown for bmad-simple-app
 
 ---
 
-### Epic 8: Export & Delivery
+### Epic 8: Export & Delivery ✅
 
 **Goal:** Coordinators can export completed ICFs in PDF, Word, or Markdown with approval tracking page.
 
@@ -360,11 +360,11 @@ This document provides the complete epic and story breakdown for bmad-simple-app
 
 **Additional Requirements:**
 - POST /api/v1/export endpoint
-- LLM formats content as Markdown
+- Document structure assembled programmatically (title + section headings); no LLM polishing step
 - python-docx for Word conversion
-- weasyprint for PDF conversion
+- xhtml2pdf for PDF conversion (replaced weasyprint — weasyprint requires system C libraries incompatible with Vercel/Render deployment)
 - Export buttons in Action Bar (PDF/Word/Markdown)
-- Approval tracking page appended to export
+- Approval tracking page appended to export with page break separator
 
 ---
 
@@ -2171,3 +2171,13 @@ So that **I can quickly get the document I need**.
 **Total Stories:** 3
 **All FRs Covered:** FR35, FR36, FR37, FR38, FR39 ✓
 **NFRs Addressed:** NFR4 ✓
+
+**Implementation Notes:**
+- Replaced weasyprint with xhtml2pdf (pure Python) — weasyprint requires system C libraries (pango, gobject, cairo) incompatible with Vercel/Render deployment
+- Document structure assembled programmatically (title + section headings) — no LLM polishing step needed since LLM already generated section content
+- Lazy imports in export_service.py for xhtml2pdf, python-docx, markdown — keeps module loadable even if deps missing, enables clean test mocking
+- Approval tracking appended as final section with `---` horizontal rule that renders as page break in DOCX and CSS page-break in PDF
+- Timestamp format: "Feb 3, 2026 at 2:30 PM" via `_format_timestamp()`
+- Toast notifications: simple state-based toast in DashboardPage, auto-dismiss after 3s, no external library
+- Concurrent exports: ActionBar tracks exporting formats in a Set, allows multiple simultaneous exports
+- No separate ExportButton component created — export button logic integrated directly into ActionBar
