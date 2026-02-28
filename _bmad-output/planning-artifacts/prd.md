@@ -439,7 +439,7 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 - FR11: System can detect participant age ranges and configure appropriate signature pages (adult consent, teen assent, parent permission)
 - FR12: Coordinator can review the proposed ICF outline as a checklist before generation
 - FR13: Coordinator can check or uncheck sections in the outline checklist to include or exclude them from generation
-- FR14: System updates the outline based on coordinator's checklist selections
+- FR14: System updates the outline based on coordinator's checklist selections. Note: if the coordinator returns to the outline after sections have been generated, confirming a modified outline resets all section state (content, statuses, and approvals are cleared and generation starts fresh). Differential updates to preserve existing section work were evaluated and deemed unnecessary (Story 4.5 dropped).
 - FR15: Coordinator can confirm the outline checklist to proceed with section generation
 
 ### Section Generation & Review
@@ -452,7 +452,7 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 - FR21: Coordinator can provide optional natural language guidance when requesting regeneration; guidance is appended to the original generation prompt
 - FR22: System can regenerate a section using relevant protocol content and the original prompt
 - FR23: System can regenerate a section incorporating coordinator's guidance appended to the original prompt
-- FR24: Coordinator can see the status of each section (generating, ready, editing, edited, approved, error)
+- FR24: Coordinator can see the status of each section (generating, regenerating, ready, editing, edited, approved, error). The `regenerating` status distinguishes re-generation requests from initial generation, preventing the streaming hook from firing during regeneration.
 - FR24a: If section generation fails (LLM error, network failure, vector DB unreachable), section displays error status with explanation and a Retry button
 
 ### Project Management
@@ -505,7 +505,7 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 
 ### Integration
 
-- NFR9: LLM API requests retry up to 3 times before displaying error to user
+- NFR9: LLM API requests retry up to 3 times before displaying error to user. Note: retry logic is currently implemented for section regeneration only; initial parallel generation attempts once and displays an error on failure.
 - NFR10: Protocol index connection failure prevents section generation; user notified with specific error message
 - NFR11: PDF extraction failures display specific error identifying problematic document
 
@@ -513,5 +513,5 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 
 - NFR12: Project state automatically maintained in memory during session (transparent to user)
 - NFR13: Users can save project to local file from the dashboard page and resume later by opening that file
-- NFR14: Save button and autosave are disabled while any section generation is in progress; no mid-generation state recovery is provided
+- NFR14: Save button is disabled while any section generation is in progress; no mid-generation state recovery is provided. There is no autosave; project state is maintained in-memory during the session and must be explicitly saved to a local file by the user.
 - NFR15: If connection is lost during generation, user must re-trigger generation for incomplete sections after reconnecting

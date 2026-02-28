@@ -57,8 +57,8 @@ The PRD defines functional requirements across 8 functional areas:
 
 **From UX Specification:**
 
-- Framework: Next.js with TypeScript
-- Styling: Tailwind CSS with custom React components
+- Framework: Next.js 16 with TypeScript and React 19
+- Styling: Tailwind CSS v4 with custom React components
 - Deployment: Vercel-compatible
 - Browsers: Chrome and Safari only
 
@@ -84,7 +84,7 @@ The PRD defines functional requirements across 8 functional areas:
    - No server-side session persistence; user saves project locally to resume later
 
 2. **State Management**
-   - Section states: Generating → Ready → Approved (with Edit/Regenerate branches)
+   - Section states: Generating/Regenerating → Ready → Approved (with Edit/Regenerate branches)
    - Project persistence across sessions and users
    - Real-time streaming state updates
 
@@ -111,38 +111,37 @@ The PRD defines functional requirements across 8 functional areas:
 
 ```text
 bmad-simple-app/                    # Monorepo root (GitHub)
-├── frontend/                       # Next.js → Vercel (auto-deploy)
+├── package.json                    # Root scripts (npm test, test:backend, test:frontend)
+├── pyproject.toml                  # Root Python config
+├── .python-version                 # 3.13
+│
+├── frontend/                       # Next.js 16 → Vercel (auto-deploy)
 │   ├── package.json
 │   ├── tsconfig.json
-│   ├── tailwind.config.ts
-│   ├── next.config.js
+│   ├── postcss.config.mjs          # Tailwind v4 PostCSS plugin
+│   ├── eslint.config.mjs           # ESLint flat config
 │   ├── src/
 │   │   ├── app/                    # App Router pages
 │   │   ├── components/             # Custom React components
-│   │   ├── lib/                    # API client, utilities
-│   │   └── styles/
-│   └── vercel.json
+│   │   ├── hooks/                  # Custom React hooks
+│   │   ├── lib/                    # API client, auth, project state, SSE
+│   │   └── types/                  # TypeScript type definitions
 │
 ├── backend/                        # FastAPI → Render (auto-deploy)
 │   ├── pyproject.toml
-│   ├── uv.lock
-│   ├── Dockerfile
-│   ├── render.yaml
-│   ├── .env.example
 │   ├── src/
 │   │   ├── main.py
 │   │   ├── config.py
 │   │   ├── api/routes/
-│   │   ├── services/
-│   │   │   ├── llm/                # Configurable LLM provider
-│   │   │   ├── rag_pipeline.py     # LangGraph workflows
-│   │   │   ├── pdf_processor.py
-│   │   │   └── vector_store.py
-│   │   ├── models/
-│   │   └── schemas/
+│   │   └── services/
+│   │       ├── llm_factory.py      # Configurable LLM provider
+│   │       ├── rag_pipeline.py     # RAG retrieval
+│   │       ├── section_graph.py    # LangGraph parallel generation
+│   │       ├── pdf_processor.py
+│   │       └── vector_store.py
 │   └── tests/
 │
-└── docs/
+└── _bmad-output/                   # BMAD framework artifacts
 ```
 
 **Deployment Flow:**
@@ -170,43 +169,18 @@ npx create-next-app@latest frontend --typescript --tailwind --eslint --app --src
 - Turbopack for development
 - ESLint for code quality
 
-### Backend Starter: FastAPI + LangChain 1.0 + LangGraph
+### Backend Starter: FastAPI + LangChain + LangGraph
 
-**Initialization:**
+**Key Dependencies (from pyproject.toml):**
 
-```bash
-cd bmad-simple-app
-mkdir backend && cd backend
-uv init
+- `fastapi`, `uvicorn[standard]`, `python-multipart` — Core framework
+- `langchain`, `langgraph` — AI orchestration
+- `langchain-anthropic`, `langchain-openai` — LLM providers
+- `qdrant-client` — Vector store
+- `pymupdf` — PDF processing
+- `pydantic-settings` — Configuration
 
-# Core framework
-uv add fastapi uvicorn[standard] python-multipart
-
-# LangChain 1.0 ecosystem (REQUIRES PYTHON 3.10+)
-uv add "langchain>=1.2.0" "langgraph>=0.3.0"
-uv add langchain-anthropic langchain-openai langchain-ollama
-
-# Vector store
-uv add qdrant-client
-
-# PDF processing
-uv add pymupdf
-
-# Export formats
-uv add python-docx weasyprint markdown
-
-# Configuration & utilities
-uv add pydantic-settings python-dotenv
-```
-
-**Note:** No database dependencies required (no SQLAlchemy, no psycopg2, no alembic).
-
-**⚠️ IMPLEMENTATION NOTE:** LangChain 1.0 and LangGraph components require close supervision during implementation due to significant API changes from earlier versions:
-
-- LCEL pipes (`|`) deprecated
-- Agent state must be TypedDict (not Pydantic)
-- New `create_agent` patterns
-- LangGraph state machine architecture
+**Note:** No database dependencies (no SQLAlchemy, no psycopg2). Export format libraries (`python-docx`, `weasyprint`, `markdown`) not yet installed — will be added in Epic 8. Ollama provider (`langchain-ollama`) was not included in MVP.
 
 ### Configuration: Configurable LLM Provider
 
@@ -214,63 +188,68 @@ uv add pydantic-settings python-dotenv
 
 ```bash
 # LLM Provider Selection
-LLM_PROVIDER=anthropic  # anthropic | openai | ollama
-LLM_MODEL=claude-sonnet-4-20250514
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-sonnet-4-6
 
-# Provider API Keys (only needed for selected provider)
+# Provider API Keys
 ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-OLLAMA_BASE_URL=http://localhost:11434
+OPENAI_API_KEY=sk-...          # Used for embeddings (OpenAI embeddings API)
 
 # Qdrant Cloud
 QDRANT_URL=https://xxx.qdrant.io
 QDRANT_API_KEY=...
-QDRANT_COLLECTION=protocols
 
 # CORS (frontend URL)
-CORS_ORIGINS=["http://localhost:3000","https://app.example.com"]
+CORS_ORIGINS=http://localhost:3000
+CORS_ORIGIN_REGEX=...          # Optional regex for additional origins
 ```
 
-**Note:** No database configuration required (no DATABASE_URL, no PostgreSQL credentials).
+**Note:** No database configuration required (no DATABASE_URL, no PostgreSQL credentials). Ollama/LM Studio support was not implemented in MVP.
 
 **Config Pattern (config.py):**
 
 ```python
-from pydantic_settings import BaseSettings
-from typing import Literal
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    # LLM Configuration
-    llm_provider: Literal["anthropic", "openai", "ollama"] = "anthropic"
-    llm_model: str = "claude-sonnet-4-20250514"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Provider-specific (only needed for selected provider)
-    anthropic_api_key: str | None = None
-    openai_api_key: str | None = None
-    ollama_base_url: str = "http://localhost:11434"
-
-    # Qdrant
-    qdrant_url: str
-    qdrant_api_key: str | None = None
-    qdrant_collection: str = "protocols"
-
-    # Application
+    # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origin_regex: str | None = None
 
-    model_config = {"env_file": ".env"}
+    # LLM Configuration
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-sonnet-4-6"
+    anthropic_api_key: str | None = None
+
+    # Qdrant & Embeddings
+    qdrant_url: str = ""
+    qdrant_api_key: str | None = None
+    openai_api_key: str | None = None  # Used for embeddings
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",")]
+        return v
+
+settings = Settings()
 ```
 
 ### Technology Decisions Summary
 
 | Concern | Frontend | Backend |
 |---------|----------|---------|
-| Language | TypeScript | Python 3.10+ |
-| Framework | Next.js 15+ (App Router) | FastAPI |
-| Styling | Tailwind CSS | N/A |
-| Package Manager | npm/pnpm | uv |
+| Language | TypeScript | Python 3.13+ |
+| Framework | Next.js 16 (App Router) | FastAPI |
+| Styling | Tailwind CSS v4 | N/A |
+| Package Manager | npm | uv |
 | AI Orchestration | N/A | LangGraph (state machine workflows) |
 | LLM Framework | N/A | LangChain 1.0+ (configurable provider) |
-| LLM Providers | N/A | Anthropic, OpenAI, Ollama/LM Studio |
+| LLM Providers | N/A | Anthropic (primary), OpenAI (embeddings) |
 | Vector DB | N/A | Qdrant Cloud |
 | PDF Processing | N/A | PyMuPDF |
 | Deployment | Vercel | Render / Local |
@@ -318,7 +297,6 @@ class Settings(BaseSettings):
 - Stores original prompts per section (for regeneration with guidance)
 - Stores approval tracking (user, date, time)
 - Saves/loads project state to local JSON files
-- Detects user inactivity and prompts to save
 
 **Rationale:**
 
@@ -371,7 +349,7 @@ class Settings(BaseSettings):
 **Flow:**
 
 1. User enters name + email on login screen
-2. Frontend stores user info in React context (and optionally localStorage for persistence)
+2. Frontend stores user info in React context + localStorage for persistence across sessions
 3. User info included in API requests that require attribution (approvals, saves)
 4. No server-side session management required
 5. User can "log out" by clearing client-side state
@@ -404,12 +382,13 @@ class Settings(BaseSettings):
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
+| GET | `/health` | Health check |
 | POST | `/api/v1/protocols/upload` | Upload PDF, extract text, index in Qdrant; returns `{protocolId, protocolName}` |
 | GET | `/api/v1/protocols` | List indexed protocols; returns `[{protocolId, protocolName, indexedAt}]` |
 | POST | `/api/v1/outline/generate` | Generate outline from protocol ID; returns proposed section checklist |
-| POST | `/api/v1/sections/generate` | SSE stream - generate sections; body: `{protocolId, sections: [...]}` |
-| POST | `/api/v1/sections/regenerate` | SSE stream - regenerate one section; body: `{protocolId, sectionName, originalPrompt, guidance?}` |
-| POST | `/api/v1/export` | Generate export document; body: `{sections: [...], approvals: [...], format: "md"|"docx"|"pdf"}` |
+| POST | `/api/v1/sections/generate` | SSE stream - generate all sections in parallel; body: `{protocolId, sections: [{id, name}, ...]}` |
+| POST | `/api/v1/sections/regenerate` | SSE stream - regenerate one section; body: `{protocolId, sectionId, sectionName, currentContent, guidance?}` |
+| POST | `/api/v1/export` | _(Not yet implemented — Epic 8 backlog)_ |
 
 **Frontend-Only Operations (no backend call):**
 
@@ -427,11 +406,14 @@ class Settings(BaseSettings):
 - Frontend accumulates streamed content and manages all project state
 - Export endpoint receives section content from frontend, LLM formats as Markdown, backend converts to PDF/Word
 
-**Streaming Pattern (SSE):**
+**Streaming Pattern (SSE via POST + fetch):**
+
+SSE is consumed via `fetch` with `body.getReader()` (not `EventSource`, which only supports GET). Both generate and regenerate endpoints use POST.
 
 ```text
-GET /api/v1/sections/generate
-Accept: text/event-stream
+POST /api/v1/sections/generate
+Content-Type: application/json
+Body: {"protocolId": "...", "sections": [{"id": "...", "name": "Purpose"}, ...]}
 
 event: section_start
 data: {"sectionId": "123", "name": "Purpose"}
@@ -443,7 +425,12 @@ event: section_complete
 data: {"sectionId": "123", "status": "ready"}
 
 event: section_error
-data: {"sectionId": "456", "status": "error", "message": "LLM request failed after 3 retries"}
+data: {"sectionId": "456", "message": "LLM request failed"}
+
+POST /api/v1/sections/regenerate
+Content-Type: application/json
+Body: {"protocolId": "...", "sectionId": "...", "sectionName": "...", "currentContent": "...", "guidance": "..."}
+(Same SSE event format as above)
 ```
 
 ### Frontend Architecture
@@ -460,7 +447,7 @@ data: {"sectionId": "456", "status": "error", "message": "LLM request failed aft
 **API Communication:**
 
 - Native `fetch` for REST endpoints
-- Native `EventSource` for SSE streaming
+- Native `fetch` with `body.getReader()` for SSE streaming (not EventSource, which only supports GET)
 - No axios or TanStack Query
 
 **Rationale:**
@@ -560,39 +547,38 @@ Multiple AI agents will implement different parts of this system. Without consis
 ```text
 src/components/
 ├── common/           # Reusable UI primitives
-│   ├── Button.tsx
-│   ├── StatusBadge.tsx
-│   ├── Spinner.tsx
-│   ├── TextInput.tsx
-│   └── FileUpload.tsx
+│   └── StatusIcon.tsx
+├── auth/
+│   └── LoginForm.tsx         # Name + email login form
 ├── dashboard/        # ICF review dashboard
-│   ├── SectionCard.tsx
-│   ├── ActionBar.tsx
-│   └── RegenerateModal.tsx
+│   ├── SectionCard.tsx       # Section with approve/edit/regenerate + streaming display
+│   ├── ActionBar.tsx         # Progress bar, Save/Export/Approve All/Change Outline
+│   ├── ApprovalBadge.tsx     # Shows who approved, when
+│   └── RegenerateModal.tsx   # Guidance input modal
 ├── projects/         # Project management
 │   ├── ProtocolSelect.tsx    # Select from indexed protocols
-│   └── OutlineChecklist.tsx  # Section checklist for outline
+│   └── ProtocolUpload.tsx    # Upload new protocol PDF
+├── outline/          # Outline review
+│   ├── OutlineChecklist.tsx  # Section checklist for outline
+│   └── ConfirmButton.tsx     # Confirm outline and start generation
 └── layout/           # Page structure
-    ├── PageHeader.tsx
-    └── Container.tsx
+    └── PageHeader.tsx        # App header with logout
 ```
 
 **Backend Service Organization:**
 
 ```text
 src/services/
-├── llm/
-│   ├── __init__.py
-│   ├── factory.py        # get_chat_model()
-│   ├── anthropic.py      # Anthropic-specific logic
-│   ├── openai.py         # OpenAI-specific logic
-│   └── ollama.py         # Ollama-specific logic
-├── rag_pipeline.py       # LangGraph workflows (outline, sections)
-├── pdf_processor.py      # PyMuPDF extraction
-├── vector_store.py       # Qdrant operations
-├── project_state.py      # In-memory project state, save/load serialization
-└── export_service.py     # LLM generates Markdown; PDF/Word derived
+├── llm_factory.py            # get_chat_model() — configurable LLM provider
+├── rag_pipeline.py           # RAG retrieval for outline and section generation
+├── section_definitions.py    # Standard ICF section definitions and prompts
+├── section_generator.py      # Single section generation logic
+├── section_graph.py          # LangGraph state machine for parallel section generation + regeneration
+├── pdf_processor.py          # PyMuPDF text extraction
+└── vector_store.py           # Qdrant operations (index, search, list)
 ```
+
+**Note:** The planned `llm/` subdirectory with per-provider modules was simplified to a single `llm_factory.py` file. The planned `project_state.py` and `export_service.py` are not yet implemented (project state is frontend-only; export is Epic 8 backlog).
 
 ### API Response Patterns
 
@@ -678,29 +664,33 @@ Structured error with code for programmatic handling:
 
 ```typescript
 type SectionStatus =
-  | "generating"  // Streaming in progress, controls disabled for this section
-  | "ready"       // Generation complete, awaiting review
-  | "editing"     // User is editing content
-  | "edited"      // Edits saved, awaiting approval
-  | "approved"    // Section approved (can still edit/regenerate)
-  | "error";      // Generation failed
+  | "generating"    // Initial streaming in progress, controls disabled for this section
+  | "regenerating"  // Re-generation in progress (distinct from generating to prevent streaming hook from re-firing)
+  | "ready"         // Generation complete, awaiting review
+  | "editing"       // User is editing content
+  | "edited"        // Edits saved, awaiting approval
+  | "approved"      // Section approved (can still edit/regenerate)
+  | "error";        // Generation failed
 
 // Valid transitions
 const validTransitions: Record<SectionStatus, SectionStatus[]> = {
   generating: ["ready", "error"],
-  ready: ["approved", "editing", "generating"],
+  regenerating: ["ready", "error"],
+  ready: ["approved", "editing", "regenerating"],
   editing: ["edited", "ready"],  // ready = cancel
-  edited: ["approved", "editing", "generating"],
-  approved: ["editing", "generating"],
-  error: ["generating"],
+  edited: ["approved", "editing", "regenerating"],
+  approved: ["editing", "regenerating"],
+  error: ["generating", "regenerating"],
 };
 ```
 
-**Generation Tracking (for save/autosave control):**
+**Generation Tracking (for save control):**
 
 ```typescript
-// Save button and autosave are DISABLED when any section is generating
-const isAnyGenerating = Object.values(sections).some(s => s.status === "generating");
+// Save button is DISABLED when any section is generating or regenerating
+const isAnyGenerating = Object.values(sections).some(
+  s => s.status === "generating" || s.status === "regenerating"
+);
 const canSave = !isAnyGenerating;
 ```
 
@@ -824,43 +814,40 @@ class ProjectResponse(ApiModel):
 
 | FR Category | Frontend Location | Backend Location |
 |-------------|-------------------|------------------|
-| Auth (FR1-3) | `src/app/page.tsx` (login), `src/lib/auth.ts`, `src/components/auth/` | N/A (client-side only) |
-| Protocol (FR4-8) | `src/app/protocols/`, `src/components/protocols/` | `src/api/routes/protocols.py`, `src/services/pdf_processor.py`, `src/services/vector_store.py` |
+| Auth (FR1-3) | `src/app/page.tsx` (login), `src/lib/auth.tsx`, `src/components/auth/` | N/A (client-side only) |
+| Protocol (FR4-8) | `src/app/projects/new/`, `src/components/projects/` | `src/api/routes/protocols.py`, `src/services/pdf_processor.py`, `src/services/vector_store.py` |
 | Outline (FR9-15) | `src/app/projects/[id]/outline/`, `src/components/outline/` | `src/api/routes/outline.py`, `src/services/rag_pipeline.py` |
-| Sections (FR16-24) | `src/app/projects/[id]/`, `src/components/dashboard/` | `src/api/routes/sections.py`, `src/services/rag_pipeline.py` |
-| Projects (FR25, FR27, FR29-30) | `src/app/page.tsx` (open file), `src/app/projects/new/` | N/A (frontend-only: save/load local files) |
-| Approvals (FR31-34) | Integrated in dashboard components | `src/models/project.py` (Pydantic models) |
-| Export (FR35-39) | `src/components/common/ExportButton.tsx` | `src/api/routes/export.py`, `src/services/export_service.py` |
-| UI Responsive (FR40-43) | Tailwind breakpoints in all components | N/A |
+| Sections (FR16-24) | `src/app/projects/[id]/`, `src/components/dashboard/`, `src/hooks/useSectionStreaming.ts` | `src/api/routes/sections.py`, `src/services/section_graph.py`, `src/services/section_generator.py` |
+| Projects (FR25, FR27, FR29-30) | `src/app/page.tsx` (open file), `src/app/projects/new/`, `src/lib/project.tsx`, `src/lib/projectFile.ts` | N/A (frontend-only: save/load local files) |
+| Approvals (FR31-34) | Integrated in dashboard components (`SectionCard`, `ActionBar`, `ApprovalBadge`) | N/A (frontend-only state) |
+| Export (FR35-39) | `ActionBar.tsx` (placeholder buttons) | Not yet implemented (Epic 8 backlog) |
+| UI Responsive (FR40-43) | Tailwind v4 breakpoints in all components | N/A |
 
 ### Complete Project Directory Structure
 
 ```text
 bmad-simple-app/
 ├── README.md
+├── CLAUDE.md
 ├── .gitignore
-├── .github/
-│   └── workflows/
-│       └── ci.yml                    # Lint, test for both frontend/backend
+├── .python-version                    # 3.13
+├── package.json                       # Root scripts: npm test, test:backend, test:frontend
+├── pyproject.toml                     # Root Python config
+├── uv.lock
 │
-├── frontend/                          # Next.js → Vercel (auto-deploy)
+├── frontend/                          # Next.js 16 → Vercel (auto-deploy)
 │   ├── package.json
 │   ├── package-lock.json
 │   ├── tsconfig.json
-│   ├── tailwind.config.ts
-│   ├── postcss.config.js
-│   ├── next.config.js
-│   ├── .env.local.example
-│   ├── .eslintrc.json
-│   ├── vercel.json
-│   │
-│   ├── public/
-│   │   └── favicon.ico
+│   ├── postcss.config.mjs             # Tailwind v4 PostCSS plugin
+│   ├── eslint.config.mjs              # ESLint flat config
+│   ├── jest.config.ts
+│   ├── jest.setup.ts
 │   │
 │   └── src/
 │       ├── app/                       # App Router pages
-│       │   ├── globals.css
-│       │   ├── layout.tsx             # Root layout with auth context
+│       │   ├── globals.css            # Tailwind v4 imports + custom styles
+│       │   ├── layout.tsx             # Root layout with AuthProvider + ProjectProvider
 │       │   ├── page.tsx               # Landing page: login + "Continue Saved Project" (FR1, FR30)
 │       │   │
 │       │   ├── projects/
@@ -871,61 +858,51 @@ bmad-simple-app/
 │       │   │       └── outline/
 │       │   │           └── page.tsx   # Outline review (FR12-15)
 │       │   │
-│       │   └── protocols/
-│       │       └── page.tsx           # Protocol list (FR7)
+│       │   └── debug/
+│       │       └── stream/
+│       │           └── page.tsx       # Debug tool for SSE stream testing
 │       │
 │       ├── components/
-│       │   ├── common/                # Reusable UI primitives
-│       │   │   ├── Button.tsx
-│       │   │   ├── StatusBadge.tsx
-│       │   │   ├── Spinner.tsx
-│       │   │   ├── TextInput.tsx
-│       │   │   ├── TextArea.tsx
-│       │   │   ├── FileUpload.tsx
-│       │   │   └── ExportButton.tsx   # PDF/Word/Markdown export (FR35-38)
+│       │   ├── common/
+│       │   │   └── StatusIcon.tsx     # Section status icon display
 │       │   │
 │       │   ├── auth/
 │       │   │   └── LoginForm.tsx      # Name + email form (FR1)
 │       │   │
 │       │   ├── dashboard/             # ICF section review
-│       │   │   ├── SectionCard.tsx    # Section with approve/edit/regenerate
-│       │   │   ├── SectionContent.tsx # Editable content area
-│       │   │   ├── ActionBar.tsx      # Approve/Edit/Regenerate buttons
-│       │   │   ├── RegenerateModal.tsx# Guidance input modal (FR21)
+│       │   │   ├── SectionCard.tsx    # Section with streaming, approve/edit/regenerate
+│       │   │   ├── ActionBar.tsx      # Progress bar, Save/Export/Approve All/Change Outline
 │       │   │   ├── ApprovalBadge.tsx  # Shows who approved, when
-│       │   │   └── StreamingContent.tsx# Real-time generation display
+│       │   │   └── RegenerateModal.tsx# Guidance input modal (FR21)
 │       │   │
 │       │   ├── projects/
 │       │   │   ├── ProtocolSelect.tsx # Select from indexed protocols (FR7-8)
 │       │   │   └── ProtocolUpload.tsx # Upload new protocol PDF (FR4)
 │       │   │
 │       │   ├── outline/
-│       │   │   ├── OutlineCheckbox.tsx  # Single section checkbox item
 │       │   │   ├── OutlineChecklist.tsx # Full checklist display (FR12-14)
 │       │   │   └── ConfirmButton.tsx    # Confirm outline and start generation (FR15)
 │       │   │
 │       │   └── layout/
-│       │       ├── PageHeader.tsx     # App header with logout
-│       │       └── Container.tsx      # Responsive container
+│       │       └── PageHeader.tsx     # App header with user info and logout
+│       │
+│       ├── hooks/
+│       │   └── useSectionStreaming.ts  # Hook managing SSE streaming for initial section generation
 │       │
 │       ├── lib/
-│       │   ├── api.ts                 # API client (fetch wrapper)
-│       │   ├── sse.ts                 # SSE client for streaming
-│       │   ├── auth.ts                # Auth context and hooks
-│       │   └── utils.ts               # Date formatting, etc.
+│       │   ├── api.ts                 # API client (fetch wrapper) + API_BASE_URL
+│       │   ├── sse.ts                 # SSE streaming via fetch + body.getReader()
+│       │   ├── auth.tsx               # AuthProvider context with localStorage persistence
+│       │   ├── project.tsx            # ProjectProvider context with useReducer
+│       │   └── projectFile.ts         # Serialize/deserialize/validate/save/load project files
 │       │
-│       └── types/
-│           ├── api.ts                 # API request/response types
-│           ├── project.ts             # Project, Section, Approval types
-│           └── protocol.ts            # Protocol types
+│       ├── types/
+│       │   └── project.ts             # SectionStatus, SectionState, ProjectState, ProjectFile types
+│       │
+│       └── __tests__/                 # All frontend tests
 │
 ├── backend/                           # FastAPI → Render (auto-deploy)
 │   ├── pyproject.toml
-│   ├── uv.lock
-│   ├── Dockerfile
-│   ├── render.yaml
-│   ├── .env.example
-│   ├── .python-version                # 3.10+
 │   │
 │   ├── src/
 │   │   ├── __init__.py
@@ -934,52 +911,49 @@ bmad-simple-app/
 │   │   │
 │   │   ├── api/
 │   │   │   ├── __init__.py
-│   │   │   ├── deps.py                # Dependency injection (project state)
 │   │   │   └── routes/
 │   │   │       ├── __init__.py
+│   │   │       ├── health.py          # GET /health
 │   │   │       ├── protocols.py       # POST /upload, GET / (FR4-8)
 │   │   │       ├── outline.py         # POST /generate (FR9-15)
-│   │   │       ├── sections.py        # POST /generate, /regenerate (FR16-24)
-│   │   │       └── export.py          # POST /export (FR35-39)
+│   │   │       └── sections.py        # POST /generate, /regenerate (FR16-24)
 │   │   │
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   ├── llm/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── factory.py         # get_chat_model() by provider
-│   │   │   │   ├── anthropic.py
-│   │   │   │   ├── openai.py
-│   │   │   │   └── ollama.py
-│   │   │   ├── rag_pipeline.py        # LangGraph workflows (outline, sections)
-│   │   │   ├── pdf_processor.py       # PyMuPDF extraction (FR5)
-│   │   │   ├── vector_store.py        # Qdrant operations (FR6)
-│   │   │   └── export_service.py      # LLM formats Markdown; converts to PDF/Word
-│   │   │
-│   │   ├── models/
-│   │   │   ├── __init__.py
-│   │   │   ├── project.py             # Project Pydantic model (not SQLAlchemy)
-│   │   │   └── section.py             # Section Pydantic model with status
-│   │   │
-│   │   └── schemas/
+│   │   └── services/
 │   │       ├── __init__.py
-│   │       ├── protocol.py            # Protocol schemas
-│   │       ├── outline.py             # Outline request/response schemas
-│   │       ├── project.py             # Project save/load schemas
-│   │       ├── section.py             # Section schemas
-│   │       └── common.py              # ErrorResponse, ApiModel base
+│   │       ├── llm_factory.py         # get_chat_model() — configurable LLM provider
+│   │       ├── rag_pipeline.py        # RAG retrieval for outline and section generation
+│   │       ├── section_definitions.py # Standard ICF section definitions and prompts
+│   │       ├── section_generator.py   # Single section generation logic
+│   │       ├── section_graph.py       # LangGraph parallel generation + regeneration
+│   │       ├── pdf_processor.py       # PyMuPDF extraction (FR5)
+│   │       └── vector_store.py        # Qdrant operations (FR6)
 │   │
 │   └── tests/
 │       ├── __init__.py
-│       ├── conftest.py                # Fixtures
-│       ├── test_protocols.py
+│       ├── conftest.py                # Fixtures (httpx AsyncClient)
+│       ├── test_config.py
+│       ├── test_health.py
+│       ├── test_llm_factory.py
 │       ├── test_outline.py
+│       ├── test_pdf_processor.py
+│       ├── test_protocols.py
+│       ├── test_rag_pipeline.py
+│       ├── test_section_generator.py
+│       ├── test_section_graph.py
 │       ├── test_sections.py
-│       ├── test_project.py
-│       └── test_export.py
+│       └── test_vector_store.py
 │
-└── docs/                              # Project documentation
-    └── api.md                         # API documentation notes
+└── _bmad-output/                      # BMAD framework artifacts
+    ├── planning-artifacts/
+    └── implementation-artifacts/
 ```
+
+**Notes on deviations from original plan:**
+- No `.github/workflows/ci.yml` — CI/CD not yet configured
+- No `Dockerfile`, `render.yaml`, `vercel.json` — deployment config not yet created
+- No `models/` or `schemas/` directories in backend — Pydantic models defined inline in route handlers
+- No separate `protocols/page.tsx` — protocol list is integrated into the new project page
+- Tailwind v4 uses CSS-based config (`globals.css`) rather than `tailwind.config.ts`
 
 ### Architectural Boundaries
 
@@ -997,9 +971,12 @@ bmad-simple-app/
 | Service | Responsibility | Dependencies |
 |---------|----------------|--------------|
 | `pdf_processor` | PDF → text extraction, error on corrupt/unreadable PDFs | PyMuPDF |
-| `vector_store` | Chunk embedding, similarity search, list collections | Qdrant Cloud |
-| `rag_pipeline` | Outline generation, section generation, regeneration with guidance | LLM, vector_store |
-| `export_service` | LLM formats content as Markdown; converts to Word/PDF | LLM, python-docx, weasyprint |
+| `vector_store` | Chunk embedding, similarity search, list collections | Qdrant Cloud, OpenAI embeddings |
+| `rag_pipeline` | Outline generation, RAG retrieval for section generation | LLM, vector_store |
+| `section_definitions` | Standard ICF section definitions and generation prompts | None |
+| `section_generator` | Single section generation logic | LLM, rag_pipeline |
+| `section_graph` | LangGraph state machine for parallel generation + regeneration | section_generator, LangGraph |
+| `llm_factory` | Configurable LLM provider instantiation | langchain-anthropic/openai |
 
 **Data Flow:**
 
@@ -1042,13 +1019,14 @@ Export:
 
 | Concern | Frontend | Backend |
 |---------|----------|---------|
-| User Identity | `lib/auth.ts` context, localStorage | User info included in export request for approval page |
+| User Identity | `lib/auth.tsx` AuthProvider context, localStorage | N/A (stateless) |
 | Error Handling | `lib/api.ts` error parsing | Structured ErrorResponse |
-| Streaming | `lib/sse.ts` EventSource | FastAPI StreamingResponse |
+| Streaming | `lib/sse.ts` fetch + body.getReader() | FastAPI StreamingResponse |
 | State Machine | `types/project.ts` SectionStatus | N/A (stateless) |
-| Project State | React state, local file save/load | N/A (stateless) |
+| Project State | `lib/project.tsx` ProjectProvider with useReducer | N/A (stateless) |
+| Project Persistence | `lib/projectFile.ts` serialize/deserialize/save/load | N/A (stateless) |
 | Generation Tracking | `isAnyGenerating` computed from section statuses | N/A (stateless) |
-| Responsive | Tailwind breakpoints | N/A |
+| Responsive | Tailwind v4 breakpoints | N/A |
 
 ## Architecture Validation Results
 

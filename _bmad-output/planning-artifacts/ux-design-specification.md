@@ -98,11 +98,11 @@ The core experience centers on **section-by-section review and approval**. Resea
 1. **Approve is the Happy Path** - Most sections approved as-is. Edit and Regenerate are escape hatches, not primary flows.
 
 2. **Progressive State, Clear Actions** - Each section shows exactly one primary action based on state:
-   - Generating → [spinner, no actions]
-   - Ready for Review → [Approve] [Edit] [Regenerate]
-   - Editing → [Save] [Cancel]
-   - Edited (saved) → [Approve] [Edit] [Regenerate]
-   - Approved → [Edit] [Regenerate] (can revise if needed)
+   - generating → [spinner/skeleton, all actions disabled]
+   - ready → [Approve] [Edit] [Regenerate]
+   - editing → [Save] [Cancel]
+   - edited → [Approve] [Edit] [Regenerate]
+   - approved → [Edit] [Regenerate] (can revise if needed)
 
 3. **AI Drafts, Human Decides** - System proposes; coordinator disposes. Every section requires explicit human approval.
 
@@ -243,11 +243,12 @@ Simple documentation, not complex workflow:
 
 Core components needed:
 
-- **Layout:** PageHeader, ContentCard, ActionBar
-- **Forms:** TextInput, FileUpload, TextArea
-- **Feedback:** StatusBadge, Spinner, Toast
-- **Section Card:** The primary dashboard component (title, content, status, actions)
-- **Buttons:** Primary, Secondary, Destructive variants
+- **Layout:** PageHeader, ActionBar
+- **Forms:** LoginForm, ProtocolUpload (drag-and-drop + acronym input), ProtocolSelect (custom dropdown)
+- **Feedback:** StatusIcon (colored circle with SVG icon), ApprovalBadge, BackendStatus, Spinner
+- **Section Card:** The primary dashboard component (title, status icon, content, actions)
+- **Outline:** OutlineChecklist, ConfirmButton
+- **Modal:** RegenerateModal
 
 ### Color Strategy
 
@@ -351,14 +352,14 @@ No major user education needed. Interaction model is intuitive: Read → Decide 
 - **Regenerate action** → Neutral/outline (secondary)
 - **Export PDF** → Red (file type convention)
 - **Export Word** → Blue (file type convention)
-- **Export Markdown** → Green (file type convention)
+- **Export Markdown** → Teal (file type convention)
 - **Status: Generating** → Amber/spinning
 - **Status: Ready** → Neutral
 - **Status: Approved** → Green with checkmark
 
 ### Typography System
 
-**Font Stack:** System fonts (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`) or Inter
+**Font Stack:** Geist Sans (body) + Geist Mono (monospace), loaded via Next.js font optimization
 
 **Type Scale:**
 
@@ -370,7 +371,7 @@ No major user education needed. Interaction model is intuitive: Read → Decide 
 | Meta/small | 12-14px | Normal | `text-sm text-slate-500` |
 | Button text | 14px | Medium | `text-sm font-medium` |
 
-**Rationale:** System fonts for instant loading and native feel. Users read substantial generated text; readability is critical.
+**Rationale:** Geist provides clean, modern typography optimized for Next.js. Users read substantial generated text; readability is critical.
 
 ### Spacing & Layout Foundation
 
@@ -388,7 +389,7 @@ No major user education needed. Interaction model is intuitive: Read → Decide 
 
 - Full-width on mobile, max-width container on desktop (1280px)
 - Single column layout for section cards (vertical stack)
-- Consistent card styling: rounded corners (`rounded-lg`), subtle shadow, white background
+- Consistent card styling: rounded corners (`rounded-lg`), subtle border (`border-slate-200`), white background
 - Generous whitespace between sections for scanability
 
 ### Accessibility Considerations
@@ -420,17 +421,17 @@ The design direction is established through the working prototype, which has bee
 
 - White background (`bg-white`)
 - Rounded corners (`rounded-lg`)
-- Subtle shadow (`shadow-sm`)
-- Clear section title with status badge
-- Content area with word count metadata
-- Right-aligned action buttons
+- Subtle border (`border border-slate-200`), no shadow
+- Status icon + section title in header, action buttons right-aligned
+- Subtitle with word count and status label
+- Content area with status-coded left border color
 
 **Color Application:**
 
-- Purple/violet gradient for header accents
+- Purple/violet for primary actions and interactive elements
 - Green for approve actions and approved status
 - Neutral/outline for secondary actions (Edit, Regenerate)
-- Red/blue/green for export buttons (matching file type conventions)
+- Red/blue/teal for export buttons (matching file type conventions)
 
 **Interaction Patterns:**
 
@@ -453,14 +454,12 @@ Building on the prototype direction, the following screens need design:
 
 | Screen | Status | Notes |
 |--------|--------|-------|
-| Login | New | Simple name + email entry |
-| Protocol Selection | Exists | From prototype (InitialScreen) |
-| Upload Protocol | Exists | From prototype (uploadProtocol) |
-| Document Type Selection | Exists | From prototype (SelectDocType) |
-| Outline Review | New | AI-proposed outline with correction input |
-| ICF Dashboard | Exists | From prototype (dashboard 1-3) |
-| Regenerate with Guidance | New | Modal or inline input for guidance text |
-| Project List | New | Resume/continue existing projects |
+| Login | Done | Simple name + email entry on landing page |
+| Landing Page | Done | New Project + Continue Saved Project actions |
+| Protocol Selection | Done | Upload new or select existing protocol (separate page) |
+| Outline Review | Done | AI-proposed checklist with confirm button |
+| Section Dashboard | Done | Section cards with streaming, approve/edit/regenerate |
+| Regenerate with Guidance | Done | Modal with optional guidance textarea |
 
 ## User Journey Flows
 
@@ -469,76 +468,80 @@ Building on the prototype direction, the following screens need design:
 ```mermaid
 flowchart TD
     subgraph Login
-        A[User arrives] --> B[Enter name + email]
+        A[User arrives at /] --> B[Enter name + email]
         B --> C[Submit login]
     end
 
-    subgraph Landing["Landing Page"]
-        C --> D[View landing page]
+    subgraph Landing["Landing Page (/)"]
+        C --> D[View authenticated landing page]
         D --> E{User action}
-        E -->|Upload new| F[Upload PDF protocol]
-        E -->|Select existing| G[Choose from protocol dropdown]
-        E -->|Continue saved| H[Click 'Continue Saved Project']
-        F --> I[System processes PDF]
-        G --> I
-        I --> J[Select document type: ICF]
-        H --> K[File picker opens]
-        K --> L{User selects file?}
-        L -->|Yes| M[Load project, go to Dashboard]
-        L -->|Cancel| D
+        E -->|New Project| F[Navigate to /projects/new]
+        E -->|Continue saved| G[Click 'Continue Saved Project']
+        G --> H[File picker opens]
+        H --> I{User selects .json file?}
+        I -->|Yes| J[Client-side load + validate]
+        I -->|Cancel| D
+        J --> K{Has confirmed outline?}
+        K -->|Yes| L[Go to Dashboard]
+        K -->|No| M[Go to Outline Review]
     end
 
-    subgraph Outline["Outline Review"]
-        J --> N[System generates checklist]
+    subgraph Protocol["Protocol Selection (/projects/new)"]
+        F --> N{Upload or select}
+        N -->|Upload new| O[Upload PDF + enter acronym]
+        N -->|Select existing| P[Choose from protocol dropdown]
+        O --> Q[Protocol processed]
+        P --> Q
+        Q --> R[Click Continue]
     end
 
-    subgraph Outline["Outline Review"]
-        L --> M[System generates checklist]
-        M --> N[View all sections with LLM pre-checked selections]
-        N --> O{Coordinator reviews}
-        O -->|Adjust| P[Check/uncheck sections]
-        P --> O
-        O -->|Satisfied| Q[Click Approve Outline]
+    subgraph Outline["Outline Review (/projects/id/outline)"]
+        R --> S[System generates checklist]
+        M --> S
+        S --> T[View sections with LLM pre-checked selections]
+        T --> U{Coordinator reviews}
+        U -->|Adjust| V[Check/uncheck sections]
+        V --> U
+        U -->|Satisfied| W[Click Confirm Outline]
     end
 
     subgraph Generation["Section Generation"]
-        Q --> R[System generates all sections in parallel]
-        R --> S[Sections stream in with status indicators]
-        S --> T[All sections ready for review]
+        W --> X[System generates all sections in parallel]
+        X --> Y[Sections stream in with status indicators]
+        Y --> Z[All sections ready for review]
     end
 
-    subgraph Review["Section Review"]
-        T --> U[Dashboard with all section cards]
-        U --> V{Review approach}
-        V -->|Read all first| W[Scroll through sections]
-        W --> X{All acceptable?}
-        X -->|Yes| Y[Click 'Approve All Sections']
-        X -->|Some need work| Z[Handle individual sections]
-        V -->|Section by section| Z
-        Z --> AA[See Section Review Loop]
-        AA --> AB{All sections approved?}
-        AB -->|No| Z
-        AB -->|Yes| AC[Export buttons enable]
-        Y --> AC
+    subgraph Review["Section Review (/projects/id)"]
+        L --> ZA[Dashboard with all section cards]
+        Z --> ZA
+        ZA --> ZB{Review approach}
+        ZB -->|Read all first| ZC[Scroll through sections]
+        ZC --> ZD{All acceptable?}
+        ZD -->|Yes| ZE[Click 'Approve All Sections']
+        ZD -->|Some need work| ZF[Handle individual sections]
+        ZB -->|Section by section| ZF
+        ZF --> ZG[See Section Review Loop]
+        ZG --> ZH{All sections approved?}
+        ZH -->|No| ZF
+        ZH -->|Yes| ZI[Export buttons enable]
+        ZE --> ZI
     end
 
     subgraph Export
-        AC --> AD{Choose format}
-        AD -->|PDF| AE[Download PDF]
-        AD -->|Word| AF[Download DOCX]
-        AD -->|Markdown| AG[Download MD]
-        AE --> AH[Email to PI]
-        AF --> AH
-        AG --> AH
+        ZI --> ZJ{Choose format}
+        ZJ -->|PDF| ZK[Download PDF]
+        ZJ -->|Word| ZL[Download DOCX]
+        ZJ -->|Markdown| ZM[Download MD]
     end
 ```
 
 **Key Decision Points:**
 
-- Landing page has three actions: upload protocol, select protocol, or continue saved project
-- No explicit "New vs Continue" choice - user action determines intent
+- Landing page has two actions: New Project (goes to protocol selection page) or Continue Saved Project (file picker)
+- Protocol selection page combines upload and existing selection on one screen (mutually exclusive — selecting one dims the other)
 - "Continue Saved Project" opens file picker; cancel returns to landing page
-- Loaded projects go directly to Dashboard at their saved state
+- Loaded projects go to Dashboard if outline is confirmed, otherwise Outline Review
+- All project file handling is client-side (no backend involved for save/load)
 - Outline review uses checkbox list with LLM pre-selections (not free-text corrections)
 - "Approve All Sections" is prominent for batch approval after read-through
 
@@ -547,36 +550,39 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[User on landing page] --> B[Click 'Continue Saved Project' button]
-    B --> C[File picker dialog opens]
+    B --> C[File picker dialog opens, accepts .json]
     C --> D{User action}
-    D -->|Select .proj file| E[File uploaded to backend]
+    D -->|Select .json file| E[Client-side: File.text → JSON.parse → validate]
     D -->|Cancel| F[Return to landing page]
-    E --> G[Backend deserializes project state]
-    G --> H{Project state}
+    E --> G{Valid project file?}
+    G -->|No| H[Show inline error message]
+    H --> A
+    G -->|Yes| I[LOAD_PROJECT + SET_PROTOCOL in context]
+    I --> J{Has confirmed outline?}
 
-    H -->|Outline not confirmed| I[Return to Outline Review screen]
-    H -->|Generation in progress| J[Restart generation, go to Dashboard]
-    H -->|Partial sections approved| K[Return to Dashboard at current state]
-    H -->|All sections approved| L[Return to Dashboard with Export enabled]
+    J -->|No| K[Navigate to Outline Review]
+    J -->|Yes| L[Navigate to Dashboard]
 
-    I --> M[Continue from where left off]
-    J --> M
-    K --> M
+    K --> M[Continue from where left off]
     L --> M
 ```
 
 **State Handling:**
 
-- Projects can be resumed at any stage: outline, partial review, complete
-- If project was mid-generation when saved, generation restarts from saved section states
-- Dashboard restores to exact previous state
+- Projects can be resumed at any stage: outline review or section dashboard
+- Project state is loaded entirely client-side via `readProjectFile()` — no backend involved
+- `LOAD_PROJECT` action replaces entire ProjectState from the loaded file
+- `SET_PROTOCOL` action restores protocol context (protocolId + protocolName)
+- Dashboard restores to exact previous state (section content, statuses, approvals)
 - User manages project files via their file system (shared folders, email, etc.)
+- Version mismatch between saved file and current app shows a `window.alert()` warning
 
 **File Format:**
 
-- Project files use `.proj` extension (or `.json`)
-- Contains all project state: protocol reference, outline, sections, approvals
+- Project files use `.json` extension
+- Contains all project state: protocol reference, outline, sections, approvals, metadata
 - Human-readable JSON format for debugging if needed
+- Validated client-side with `validateProjectFile()` before loading
 
 ### Section Review Loop
 
@@ -586,9 +592,9 @@ flowchart TD
 
     B -->|Generating| C[Show spinner + streaming text]
     C --> D[Generation complete]
-    D --> E[Status: Ready for Review]
+    D --> E[Status: ready]
 
-    B -->|Ready for Review| E
+    B -->|ready| E
     E --> F[Show: Approve / Edit / Regenerate buttons]
 
     F --> G{User action}
@@ -618,9 +624,10 @@ flowchart TD
 
 **Interaction States:**
 
-- Generating → Ready for Review → Approved
-- Edit creates intermediate "Edited" state requiring explicit approval
+- generating → ready → approved (happy path)
+- Edit creates intermediate "editing" → "edited" state requiring explicit approval
 - Approved sections can still be edited or regenerated if user changes mind
+- Regenerate goes through "regenerating" status (distinct from initial "generating")
 
 ### Flow Optimization Principles
 
@@ -661,35 +668,47 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ [Status Badge]  Section Title                    Word Count │
+│ [StatusIcon]  Section Title        [Approve] [Edit] [Regen] │
+│              N words · Status: label                        │
+│ [ApprovalBadge: ✓ Approved by Name on Date]  (if approved) │
 ├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Section content text...                                    │
-│  (Streaming text appears here during generation)            │
-│  (Editable when in Edit mode)                               │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│                          [Regenerate] [Edit] [Approve]      │
+│ ┃                                                           │
+│ ┃ Section content text...                                   │
+│ ┃ (Streaming text appears here during generation)           │
+│ ┃ (Editable textarea when in Edit mode)                     │
+│ ┃ (Skeleton pulse bars when generating with no content yet) │
+│ ┃                                                           │
+│ (left border color-coded by status)         max-h-96 scroll │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**StatusIcon** is an 8×8 colored circle with a white SVG icon inside:
+
+| Status | Color | Icon |
+|--------|-------|------|
+| generating | `bg-amber-400` | lightning bolt |
+| regenerating | `bg-amber-400` | refresh arrows |
+| ready | `bg-teal-500` | document |
+| editing | `bg-blue-500` | pencil |
+| edited | `bg-slate-400` | pencil |
+| approved | `bg-emerald-500` | checkmark |
+| error | `bg-red-500` | warning triangle |
+
+**Content area left-border colors:** amber (generating/regenerating), slate (ready/edited), blue (editing), emerald (approved), red (error).
+
 **States:**
 
-| State | Status Badge | Content Area | Actions Available |
-|-------|--------------|--------------|-------------------|
-| Generating | Amber spinner + "Generating" | Streaming text, not editable | None |
-| Ready for Review | Neutral "Ready" | Static text, not editable | Approve, Edit, Regenerate |
-| Editing | Neutral "Editing" | Editable textarea | Save, Cancel |
-| Edited (unsaved) | Neutral "Edited" | Static text showing edits | Approve, Edit, Regenerate |
-| Approved | Green checkmark + "Approved" | Static text, not editable | Edit, Regenerate (can revise) |
-| Regenerating | Amber spinner + "Regenerating" | Previous text fades, new streams in | None |
-| Error | Red "Error" | Error message | Retry, Edit manually |
+| State | StatusIcon | Content Area | Actions Available |
+|-------|------------|--------------|-------------------|
+| Generating | Amber lightning | Skeleton pulse or streaming text | None (all disabled) |
+| Ready | Teal document | Static text, not editable | Approve, Edit, Regenerate |
+| Editing | Blue pencil | Editable textarea with blue focus ring | Save, Cancel |
+| Edited | Slate pencil | Static text showing edits | Approve, Edit, Regenerate |
+| Approved | Green checkmark | Static text + ApprovalBadge shown | Edit, Regenerate (can revise) |
+| Regenerating | Amber refresh | Streaming new text | None (all disabled) |
+| Error | Red warning | Error message in red text | Edit, Regenerate (no dedicated Retry) |
 
-**Variants:**
-
-- **Default** - Standard card for most sections
-- **Collapsed** - Shows only header row (title + status + word count) for long documents; click to expand
-- **Expanded** - Full content visible (default state)
+**Variants:** Single variant only — all cards always show full content (no collapsed/expanded toggle).
 
 **Accessibility:**
 
@@ -704,9 +723,9 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 **Content Guidelines:**
 
 - Section title comes from outline (e.g., "Purpose of the Study", "Risks and Discomforts")
-- Word count updates in real-time during streaming
-- Content is markdown-rendered for readability (paragraphs, lists)
-- Maximum content height with scroll for very long sections
+- Word count displayed in subtitle, updates after generation completes
+- Content rendered as plain text with `whitespace-pre-wrap` (not markdown-rendered)
+- Maximum content height (`max-h-96`) with `overflow-y-auto` scroll for long sections
 
 **Interaction Behavior:**
 
@@ -753,7 +772,7 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 │  ☐ Parent/Guardian Permission (not detected)                │
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
-│                                        [Approve Outline]    │
+│                                        [Confirm Outline]    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -761,22 +780,20 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 | State | Description | Actions Available |
 |-------|-------------|-------------------|
-| Default | Checkboxes reflect LLM recommendations | Check/uncheck any item, Approve Outline |
-| Modified | User has changed from LLM defaults | Check/uncheck any item, Approve Outline |
+| Default | Checkboxes reflect LLM recommendations | Check/uncheck any item, Confirm Outline |
+| Modified | User has changed from LLM defaults | Check/uncheck any item, Confirm Outline |
 | Approved | Outline confirmed, proceeding to generation | None (navigates to Dashboard) |
 
-**Variants:**
-
-- **Grouped** (default) - Sections organized by category (Standard, Conditional, Signatures)
-- **Flat** - All sections in single list (if categories not useful)
+**Layout:** Responsive two-column grid (`grid-cols-1 md:grid-cols-2`). Left column: Standard Sections. Right column: Conditional Sections + Signature Pages. Each category in a `<fieldset>` with `<legend>` heading.
 
 **Accessibility:**
 
-- `role="group"` with `aria-labelledby` for each category heading
-- Each checkbox: standard `<input type="checkbox">` with associated `<label>`
-- Detection notes use `aria-describedby` to associate with checkbox
+- `<fieldset>` with `<legend>` for each category grouping (Standard, Conditional, Signatures)
+- Each checkbox: standard `<input type="checkbox">` with `violet-600` accent color, wrapped in `<label>`
+- Detection reasons shown as `text-xs text-slate-500` below section name
+- Focus: `focus:ring-2 focus:ring-violet-500` on checkboxes
 - Keyboard: Tab between checkboxes, Space to toggle
-- Approve button: `aria-label="Approve outline and begin generation"`
+- Confirm button disabled with helper text when no sections selected (`role="status"`)
 
 **Content Guidelines:**
 
@@ -789,7 +806,7 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 - **Page load:** LLM recommendations pre-checked. User reviews.
 - **Checkbox click:** Toggles checked state. No auto-save.
-- **Approve Outline click:** Confirms selections. Navigates to Dashboard. Triggers parallel section generation.
+- **Confirm Outline click:** Builds `ConfirmedOutline` with initial `SectionState[]` (all set to `status: "generating"`). Calls `confirmOutline()` in context. Navigates to Dashboard where parallel section generation begins.
 
 #### Project Card
 
@@ -809,38 +826,44 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  [Approve All Sections]   [Save Project]   [PDF] [Word] [MD]│
-│                                                             │
-│  Progress: ████████░░ 8/12 approved                         │
+│  ICF Sections                                               │
+│  [status icon] N/N approved    [Save] [Approve All] [PDF] [Word] [MD] │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+Left side: "ICF Sections" heading with progress indicator below. While generating: spinning arrows icon + "Generating..." in amber. All approved: checkmark icon + "N/N approved" in emerald. Otherwise: plain "N/N approved" in slate.
+
+Right side: buttons in a `flex-wrap gap-2` row.
+
+**Styling:** Sticky (`sticky top-0 z-10`), `bg-white/95 backdrop-blur` for transparency effect while scrolling.
 
 **States:**
 
 | State | Approve All | Save Project | Export Buttons | Progress |
 |-------|-------------|--------------|----------------|----------|
-| Generating | Disabled | Disabled | Disabled | "Generating..." |
-| All generated, none approved | Enabled, green | Enabled | Disabled | "0/12 approved" |
-| Partial approved | Enabled, green | Enabled | Disabled | "8/12 approved" |
-| All approved | Hidden or "All Approved ✓" | Enabled | Enabled, colored | "12/12 approved ✓" |
+| Generating | Disabled | Disabled (slate outline) | Disabled | Spinning arrows + "Generating..." (amber) |
+| All generated, none approved | Enabled (emerald-600) | Enabled (slate outline) | Disabled | "0/12 approved" (slate) |
+| Partial approved | Enabled (emerald-600) | Enabled | Disabled | "8/12 approved" (slate) |
+| All approved | Disabled, text "All Approved" | Enabled | Enabled, colored | Checkmark + "12/12 approved" (emerald) |
 
 **Button Specifications:**
 
 | Button | Style | Behavior |
 |--------|-------|----------|
-| Approve All Sections | Green filled, prominent | Approves all "Ready" sections |
-| Save Project | Outline/secondary | Downloads project JSON file to local system |
-| PDF | Red icon | Exports final ICF as PDF |
-| Word | Blue icon | Exports final ICF as DOCX |
-| MD | Green icon | Exports final ICF as Markdown |
+| Save Project | Slate outline, secondary | Downloads project `.json` file via browser download |
+| Approve All Sections | Emerald-600 filled | Approves all "ready" + "edited" sections; changes to disabled "All Approved" when complete |
+| PDF | Red-600 filled | Stub — not yet implemented (Epic 8) |
+| Word | Blue-600 filled | Stub — not yet implemented (Epic 8) |
+| Markdown | Teal-600 filled | Stub — not yet implemented (Epic 8) |
 
 **Save Project Behavior:**
 
-- Enabled only after all sections have completed generation (no streaming in progress)
-- Disabled during generation to prevent saving incomplete/undefined state
-- Click triggers download of project file (`.proj` or `.json`)
+- Disabled during generation (while any section is generating/regenerating)
+- Enabled once all sections have completed generation
+- Click triggers client-side download of project `.json` file via `URL.createObjectURL()` + anchor click
 - File contains complete project state for later resume
 - No confirmation dialog needed (non-destructive action)
+- Download filename: sanitized from `protocolName` (or `protocolId` fallback)
 
 **Note:** Save Project is available only on the Dashboard page. The landing page has "Continue Saved Project" to open files.
 
@@ -851,22 +874,21 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 **Accessibility:**
 
-- `role="toolbar"` with `aria-label="Section actions and export"`
-- Approve All: `aria-label="Approve all sections"` + `aria-disabled` when disabled
+- Approve All: `aria-label="Approve all sections"` + `disabled` attribute when disabled
 - Export buttons: `aria-label="Export as PDF"`, etc.
-- Progress bar: `role="progressbar"` with values
+- Progress indicator: text-based (no `role="progressbar"`)
 - Keyboard: Tab between buttons, Enter to activate
 
 **Content Guidelines:**
 
-- "Approve All Sections" is the primary action - largest, green, leftmost
-- Export buttons use file-type colors (PDF=red, Word=blue, Markdown=green)
-- Progress shows fraction approved out of total
-- When all approved, celebrate: checkmark, "All Approved" state
+- Save Project is leftmost in the button row, followed by Approve All, then export buttons
+- Export buttons use file-type colors (PDF=red, Word=blue, Markdown=teal)
+- Progress shows fraction approved out of total as text
+- When all approved: checkmark icon, emerald text, "All Approved" button state
 
 **Interaction Behavior:**
 
-- **Approve All click:** Approves all sections that are in "Ready for Review" state. Records user/date/time for each. Progress jumps to 100%.
+- **Approve All click:** Approves all sections that are in "ready" or "edited" state. Records user/date/time for each.
 - **Export click (when enabled):** Downloads file in selected format. Includes approval tracking page.
 - **Disabled state:** Buttons appear grayed, cursor shows not-allowed, click does nothing
 - **Sticky behavior:** Bar stays visible at top of viewport; shadow appears when scrolled
@@ -877,26 +899,20 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 **Variants:**
 
-- **Primary** - Green, filled (`bg-emerald-500 text-white`) - Approve actions
-- **Secondary** - Outline (`border border-slate-300 text-slate-700`) - Edit, Regenerate
-- **Destructive** - Red, filled (`bg-red-500 text-white`) - Delete, Cancel destructive action
-- **Export PDF** - Red icon + text
-- **Export Word** - Blue icon + text
-- **Export Markdown** - Green icon + text
+- **Primary CTA** - Violet-600 filled (`bg-violet-600 text-white`) - Upload, Continue, New Project
+- **Approve** - Emerald filled (`bg-emerald-500/600 text-white`) - Approve actions, Confirm Outline
+- **Secondary** - Outline (`border border-slate-300 text-slate-700`) - Edit, Regenerate, Save Project
+- **Export PDF** - Red-600 filled
+- **Export Word** - Blue-600 filled
+- **Export Markdown** - Teal-600 filled
 
 **Sizes:** `sm` (tight padding), `md` (default), `lg` (prominent actions)
 
 **States:** Default, Hover, Active, Disabled, Loading (with spinner)
 
-#### Status Badge
+#### StatusIcon
 
-**Variants:**
-
-- **Generating** - Amber background, spinner icon, "Generating" text
-- **Ready** - Slate/neutral background, "Ready for Review" text
-- **Approved** - Green background, checkmark icon, "Approved" text
-- **Edited** - Slate background, "Edited" text
-- **Error** - Red background, warning icon, "Error" text
+Status is shown as an 8×8 `rounded-full` colored circle with a white SVG icon inside (see Section Card StatusIcon table above). The status label also appears as text in the section card subtitle ("Status: ready", "Status: approved", etc.).
 
 #### Text Input
 
@@ -906,11 +922,15 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 **Variants:** Single-line input, Multi-line textarea (for guidance)
 
-#### File Upload
+#### File Upload (ProtocolUpload)
 
-**Usage:** Protocol upload
+**Usage:** Protocol upload on `/projects/new` page
 
-**States:** Default (drop zone), Dragging over, Uploading (progress), Complete, Error
+**Anatomy:** Drag-and-drop zone (`rounded-xl border-2 border-dashed p-12`) with "Protocol Acronym" text input below (3-20 chars, validated). Upload button disabled until file selected.
+
+**States:** Default (drop zone with upload arrow), Dragging (violet border), File selected (emerald border, filename shown, "Change file" link), Uploading (spinner, "Processing protocol..."), Success (checkmark, emerald), Error (warning, red, "Try Again")
+
+**Mutual exclusion:** Dims (`opacity-50 pointer-events-none`) when an existing protocol is selected in the ProtocolSelect component below.
 
 #### Spinner
 
@@ -924,50 +944,50 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  [← Back]  Page Title                          [User Name]  │
-│            Subtitle or context                  [Logout]    │
+│  [← Back Label]  Page Title                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Component Implementation Roadmap
+- `role="banner"`, full-width with `bg-white border-b border-slate-200`
+- Back button is optional (`showBack` prop), displays configurable label (e.g., "Home", "Select Protocol", "Change Outline")
+- No user name or logout in header — auth UI is only on the landing page
+- Title is `text-xl font-semibold`
 
-**Phase 1 - Core Components (MVP Critical Path):**
+### Implemented Components
 
-1. **Section Card** - Required for Dashboard (core experience)
-2. **Action Bar** - Required for Dashboard (Approve All + Save Project + Export)
-3. **Button** - Required everywhere
-4. **Status Badge** - Required for Section Card
+All components are implemented as custom React components with Tailwind utility classes:
 
-**Phase 2 - Flow Components:**
+1. **SectionCard** - Dashboard section display with status, content, and actions
+2. **ActionBar** - Sticky bar with progress, Save, Approve All, and export buttons
+3. **StatusIcon** - Colored circle with SVG icon for section status
+4. **ApprovalBadge** - Emerald checkmark badge showing approver name and date
+5. **OutlineChecklist** - Two-column checkbox grid for outline review
+6. **ConfirmButton** - Emerald confirm button with disabled state and helper text
+7. **ProtocolUpload** - Drag-and-drop file upload with acronym input
+8. **ProtocolSelect** - Custom dropdown for existing protocols with date display
+9. **LoginForm** - Name + email form on landing page
+10. **PageHeader** - Title bar with optional back navigation
+11. **RegenerateModal** - Fixed overlay modal with guidance textarea
+12. **BackendStatus** - Connection status indicator (green/red/slate dot + text) on landing page
 
-5. **Outline Checklist** - Required for Outline Review screen
-6. **File Upload** - Required for Protocol Upload screen
-7. **Text Input** - Required for Login + Regenerate guidance
-8. **Page Header** - Required for all screens
+**Not Implemented (deferred):**
 
-**Phase 3 - Landing Page:**
-
-9. **Protocol Selector** - Dropdown for existing protocols
-10. **Continue Saved Project Button** - Opens file picker dialog
-11. **Spinner** - Enhancement for loading states
-
-**Removed Components:**
-
-- **Project Card** - No longer needed (no central project list)
-- **Project List** - No longer needed (users manage files locally)
+- **Project Card / Project List** - No central project list (users manage files locally)
+- **Toast** - No toast notification system; errors shown inline
 
 ## UX Consistency Patterns
 
 ### Button Hierarchy
 
-**Action Bar Buttons (Dashboard top):**
+**Action Bar Buttons (Dashboard top, right side):**
 
 | Button | Style | State Logic |
 |--------|-------|-------------|
-| Approve All Sections | Large, green filled, prominent | Enabled when ≥1 section is "Ready for Review"; Hidden or shows "All Approved ✓" when complete |
-| PDF | Red icon+text, outline | Disabled until all sections approved |
-| Word | Blue icon+text, outline | Disabled until all sections approved |
-| Markdown | Green icon+text, outline | Disabled until all sections approved |
+| Save Project | Slate outline | Disabled during generation |
+| Approve All Sections | Emerald-600 filled | Enabled when ≥1 section is approvable; shows disabled "All Approved" when complete |
+| PDF | Red-600 filled | Disabled until all sections approved (stub) |
+| Word | Blue-600 filled | Disabled until all sections approved (stub) |
+| Markdown | Teal-600 filled | Disabled until all sections approved (stub) |
 
 **Section Card Buttons:**
 
@@ -999,32 +1019,31 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 | Trigger | Feedback |
 |---------|----------|
-| Section approved | Status badge instantly changes to green "Approved" with checkmark; no toast needed |
-| All sections approved | Export buttons enable; subtle celebration (badge glow or confetti optional) |
-| Export complete | Browser download starts; toast "Downloaded [filename]" |
+| Section approved | StatusIcon changes to emerald checkmark; ApprovalBadge appears with name and date |
+| All sections approved | Export buttons enable; progress text turns emerald with checkmark icon |
+| Export complete | Browser download starts (no toast — download handled natively by browser) |
 
 **Error Feedback:**
 
 | Trigger | Feedback |
 |---------|----------|
-| Generation fails | Status badge shows red "Error"; error message in content area; "Retry" button appears |
-| Network error | Toast at top: "Connection lost. Retrying..." with auto-retry |
-| Save fails | Toast: "Failed to save. Please try again." with manual retry |
+| Generation fails | StatusIcon shows red warning; error message in content area in red text; Edit and Regenerate buttons available |
+| Project file load fails | Inline error message (`text-red-600`, `role="alert"`) on landing page |
+| Version mismatch on load | `window.alert()` warning (no toast system) |
 
 **Loading/Progress Feedback:**
 
 | Trigger | Feedback |
 |---------|----------|
-| Section generating | Amber spinner in status badge; streaming text in content area |
+| Section generating | Amber StatusIcon with lightning bolt; skeleton pulse bars then streaming text in content area |
 | Bulk approve in progress | Each section updates individually as approved (ripple effect down the list) |
-| File uploading | Progress bar in upload component |
+| File uploading | Spinner + "Processing protocol..." text in upload component |
 
 **Feedback Principles:**
 
-1. **Inline over toast** - Status changes happen in-place (badges update) rather than toast notifications
-2. **Toast for global events** - Network errors, download complete, save failures
-3. **No confirmation dialogs** - Actions are reversible (can edit after approve), so no "Are you sure?"
-4. **Immediate visual change** - Click → instant feedback, no waiting
+1. **Inline everywhere** - All feedback is inline (status icons, error messages, `role="alert"` elements). No toast notification system.
+2. **No confirmation dialogs** - Actions are reversible (can edit after approve), so no "Are you sure?"
+3. **Immediate visual change** - Click → instant feedback, no waiting
 
 ### State Transition Patterns
 
@@ -1032,31 +1051,34 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 ```
 ┌──────────────┐
-│  Generating  │ ──(complete)──→ ┌─────────────────────┐
-└──────────────┘                 │  Ready for Review   │
-       ↑                         └─────────────────────┘
-       │                                │    │    │
-       │                         (approve) (edit) (regenerate)
-       │                                │    │    │
-       │                                ↓    │    │
-       │                         ┌──────────┐│    │
-       │                         │ Approved ││    │
-       │                         └──────────┘│    │
-       │                              │ ↑    │    │
-       │                        (edit)│ │    │    │
-       │                              ↓ │    ↓    │
-       │                         ┌──────────┐     │
-       │                         │ Editing  │     │
-       │                         └──────────┘     │
-       │                              │           │
-       │                          (save)          │
-       │                              ↓           │
-       │                         ┌──────────┐     │
-       │                         │  Edited  │←────┘ (cancel returns to previous)
+│  generating  │ ──(complete)──→ ┌──────────┐
+└──────────────┘                 │  ready   │
+                                 └──────────┘
+  ┌───────────────┐                   │    │    │
+  │ regenerating  │            (approve) (edit) (regenerate)
+  └───────────────┘                   │    │    │
+       ↑                              ↓    │    │
+       │                         ┌──────────┐│   │
+       │                         │ approved ││   │
+       │                         └──────────┘│   │
+       │                              │ ↑    │   │
+       │                        (edit)│ │    │   │
+       │                              ↓ │    ↓   │
+       │                         ┌──────────┐    │
+       │                         │ editing  │    │
+       │                         └──────────┘    │
+       │                              │          │
+       │                          (save)         │
+       │                              ↓          │
+       │                         ┌──────────┐    │
+       │                         │  edited  │←───┘ (cancel returns to previous)
        │                         └──────────┘
        │                              │
        └──────────(regenerate)────────┘
+       (also from ready, approved)
 ```
+
+Note: `regenerating` is a distinct status from `generating` — this prevents the `useSectionStreaming` hook from firing during regeneration (which uses a different API call pattern).
 
 **Transition Animations:**
 
@@ -1081,24 +1103,24 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 | Context | Message | Action |
 |---------|---------|--------|
-| No projects yet | "No ICF projects yet. Start by uploading a protocol." | [New Project] button |
-| No protocols uploaded | "Upload a clinical protocol to get started." | [Upload Protocol] button |
-| Dashboard before generation | Skeleton cards or "Generating sections..." message | None (auto-proceeds) |
+| No protocols uploaded | Protocol dropdown shows "No protocols uploaded yet" | Upload section above |
+| Dashboard before content | Skeleton pulse bars (4 bars of varying widths) in section cards | None (auto-generates) |
 
 **Loading States:**
 
 | Context | Treatment |
 |---------|-----------|
-| Page loading | Skeleton UI matching final layout (gray placeholder boxes) |
-| Project list loading | Skeleton project cards |
-| Protocol processing | Progress indicator: "Processing protocol... (this may take a moment)" |
-| Section generation | Real cards with streaming content (not skeleton) |
+| Auth check on landing page | Centered violet spinner on `bg-slate-50` |
+| Protocol list loading | Single animated pulse skeleton bar |
+| Outline generation | Centered violet spinner + "Generating outline..." text |
+| Protocol upload processing | Spinner with "Processing protocol..." |
+| Section generation | Real cards with skeleton pulse bars, then streaming content |
 
 **Skeleton Principles:**
 
-- Match final layout shape (card outlines, text line placeholders)
-- Subtle pulse animation
-- No spinners for page-level loading (spinners for inline actions only)
+- `animate-pulse rounded bg-slate-200` bars for content placeholders
+- Centered spinners (`animate-spin rounded-full border-4`) for page-level loading
+- Section cards use skeleton bars until streaming content begins
 
 ### Modal Patterns
 
@@ -1110,47 +1132,37 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Regenerate: [Section Name]                            [X]  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  How would you like this section improved?                  │
-│                                                             │
-│  Tell the AI what to change - tone, missing details,        │
-│  specific wording, or anything else. The AI will use        │
-│  this guidance along with the protocol to regenerate.       │
-│                                                             │
-│  Leave blank to regenerate without specific guidance.       │
+│  Regenerate: [Section Name]                                 │
+│  Provide optional guidance to improve the regenerated       │
+│  content.                                                   │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │                                                     │    │
-│  │                                                     │    │
+│  │  e.g. Use simpler language, be more concise, add    │    │
+│  │  more detail about risks...                         │    │
 │  └─────────────────────────────────────────────────────┘    │
-│  Examples: "Make this more reassuring" • "Add the           │
-│  injection site reactions from page 34" • "Simpler          │
-│  language for patients"                                     │
 │                                                             │
-├─────────────────────────────────────────────────────────────┤
 │                                   [Cancel]    [Regenerate]  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Modal Behavior:**
 
-- Centered on screen with backdrop overlay
-- Click outside or X to close (same as Cancel)
-- Escape key closes
-- Focus trapped inside modal
-- Primary action (Regenerate) on right, secondary (Cancel) on left
+- `fixed inset-0 z-50` with `bg-black/50` backdrop overlay
+- `max-w-lg rounded-lg bg-white p-6 shadow-xl` centered card
+- No X button — use Cancel button to close
+- Textarea has placeholder text with example guidance (rows=4, resize-y)
+- Primary action (Regenerate, blue-600) on right, secondary (Cancel, slate outline) on left
 - Regenerate works with or without guidance text
 
 ### Form Patterns
 
-**Login Form:**
+**Login Form (on landing page):**
 
 - Two fields: Name (text), Email (email)
-- Single "Continue" button
+- Submit button
 - No validation beyond required fields and email format
 - Error shown inline below field
+- Auth stored in localStorage (no real auth server)
 
 **Guidance Input (in modal):**
 
@@ -1171,19 +1183,21 @@ Tailwind CSS provides design tokens (colors, spacing, typography, shadows) but n
 **Linear Workflow:**
 
 ```
-Login → Landing → Protocol Selection → Outline Review → Dashboard → (Export)
+Login (/) → Landing (/) → Protocol Selection (/projects/new) → Outline Review (/projects/[id]/outline) → Dashboard (/projects/[id]) → (Export)
 ```
 
 **Back Navigation:**
 
-- Browser back button works naturally (each step is a route)
-- Explicit "← Back" link in page header where contextually useful
-- Dashboard has no back (it's the destination)
+- Each page has a contextual back button via PageHeader:
+  - Protocol Selection → "Home" (back to landing)
+  - Outline Review → "Select Protocol" (back to protocol selection)
+  - Dashboard → "Change Outline" (calls `unconfirmOutline()`, back to outline review)
+- Browser back button also works naturally (each step is a route)
 
 **Header Navigation:**
 
-- User name displayed in header
-- Logout available from any screen
+- No user name or logout in page headers
+- Auth UI (login/logout) is only on the landing page
 - No hamburger menu or complex navigation
 
 ## Responsive Design & Accessibility
@@ -1212,14 +1226,14 @@ Login → Landing → Protocol Selection → Outline Review → Dashboard → (E
 
 | Element | Mobile Treatment |
 |---------|------------------|
-| Section Cards | Full width, vertical stacking, collapsible |
+| Section Cards | Full width, vertical stacking |
 | Action Bar | Sticky, "Approve All" full width, export buttons in row below |
 | Content | Single column, reduced padding |
 | Buttons | Full width for primary actions |
 
 **Key Adaptations:**
 
-1. **Section Card on mobile:** Collapsed by default showing only title + status + word count. Tap to expand and see full content.
+1. **Section Card on mobile:** Full width, same layout as desktop (no collapsed variant implemented).
 2. **Action Bar on mobile:** Stacks vertically - "Approve All" on top, export buttons in row below.
 3. **Outline Checklist on mobile:** Full width checkboxes, larger touch targets.
 4. **Modal on mobile:** Full-screen takeover instead of centered overlay.
@@ -1265,10 +1279,10 @@ This matches the PRD requirement: "No formal WCAG compliance requirements for MV
 | Component | Accessibility Treatment |
 |-----------|------------------------|
 | Section Card | `role="article"`, `aria-labelledby` for title |
-| Status Badge | `aria-live="polite"` announces changes |
+| StatusIcon | Status conveyed via icon + color + text label in subtitle |
 | Action buttons | `aria-label="[Action] [Section Name]"` |
 | Modal | Focus trap, Escape to close, `role="dialog"` |
-| Progress bar | `role="progressbar"` with min/max/current |
+| Progress indicator | Text-based "N/N approved" with status icon |
 | Checkboxes | Standard `<input>` with associated `<label>` |
 
 ### Testing Strategy
