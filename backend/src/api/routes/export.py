@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from src.services.export_service import (
     ExportError,
     assemble_markdown,
+    build_approval_tracking,
     convert_markdown_to_docx,
     convert_markdown_to_pdf,
 )
@@ -77,6 +78,18 @@ async def export_document(req: ExportRequest):
     ]
 
     md_content = assemble_markdown(sections, protocol_name)
+
+    approvals = [
+        {
+            "sectionId": a.sectionId,
+            "userName": a.userName,
+            "timestamp": a.timestamp,
+        }
+        for a in req.approvals
+    ]
+    tracking = build_approval_tracking(approvals, sections)
+    if tracking:
+        md_content = md_content + "\n" + tracking
 
     fmt = req.format
     try:
