@@ -774,6 +774,166 @@ describe("Dashboard Page", () => {
     });
   });
 
+  it("renders empty state when sections array is empty", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const emptySections: SectionState[] = [];
+    renderWithSections(emptySections);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No sections in this outline.")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("regenerate stream processes chunk and complete events", async () => {
+    const { streamSectionRegenerate } = require("@/lib/sse");
+
+    async function* fakeStream() {
+      yield {
+        event: "section_chunk" as const,
+        sectionId: "uuid-2",
+        content: "New content chunk",
+      };
+      yield {
+        event: "section_complete" as const,
+        sectionId: "uuid-2",
+        status: "ready",
+      };
+    }
+    streamSectionRegenerate.mockReturnValue(fakeStream());
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const readySections: SectionState[] = [
+      {
+        id: "uuid-2",
+        name: "Study Procedures",
+        content: "Old content.",
+        status: "ready",
+        originalPrompt: "",
+      },
+    ];
+    renderWithSections(readySections);
+
+    const regenBtn = await screen.findByRole("button", {
+      name: /regenerate study procedures/i,
+    });
+    await userEvent.click(regenBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Regenerate" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("New content chunk")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Ready for review/)).toBeInTheDocument();
+    });
+  });
+
+  it("regenerate stream processes error event", async () => {
+    const { streamSectionRegenerate } = require("@/lib/sse");
+
+    async function* fakeStream() {
+      yield {
+        event: "section_error" as const,
+        sectionId: "uuid-2",
+        message: "LLM generation failed",
+      };
+    }
+    streamSectionRegenerate.mockReturnValue(fakeStream());
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const readySections: SectionState[] = [
+      {
+        id: "uuid-2",
+        name: "Study Procedures",
+        content: "Old content.",
+        status: "ready",
+        originalPrompt: "",
+      },
+    ];
+    renderWithSections(readySections);
+
+    const regenBtn = await screen.findByRole("button", {
+      name: /regenerate study procedures/i,
+    });
+    await userEvent.click(regenBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Regenerate" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Error/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("LLM generation failed")).toBeInTheDocument();
+  });
+
+  it("regenerate stream catch handles non-abort errors", async () => {
+    const { streamSectionRegenerate } = require("@/lib/sse");
+
+    async function* fakeStream(): AsyncGenerator<never> {
+      throw new Error("Network failure");
+    }
+    streamSectionRegenerate.mockReturnValue(fakeStream());
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const readySections: SectionState[] = [
+      {
+        id: "uuid-2",
+        name: "Study Procedures",
+        content: "Old content.",
+        status: "ready",
+        originalPrompt: "",
+      },
+    ];
+    renderWithSections(readySections);
+
+    const regenBtn = await screen.findByRole("button", {
+      name: /regenerate study procedures/i,
+    });
+    await userEvent.click(regenBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Regenerate" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Status: Error/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Network failure/)).toBeInTheDocument();
+  });
+
   it("saving edits to an approved section clears approval and sets status to edited", async () => {
     localStorage.setItem(
       "user",

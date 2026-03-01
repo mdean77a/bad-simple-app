@@ -13,6 +13,7 @@ from src.services.export_service import (
     assemble_markdown,
     build_approval_tracking,
     convert_markdown_to_docx,
+    convert_markdown_to_pdf,
 )
 
 
@@ -240,6 +241,78 @@ class TestConvertMarkdownToDocx:
         assert "Purpose of the Study" in texts
         assert "Study Procedures" in texts
 
+    def test_import_error_raises_export_error(self):
+        real_import = __import__
+
+        def fail_import(name, *args, **kwargs):
+            if name == "docx":
+                raise ImportError("No module named 'docx'")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fail_import):
+            with pytest.raises(ExportError, match="DOCX export requires python-docx"):
+                convert_markdown_to_docx("# Title")
+
+    def test_generic_exception_raises_export_error(self):
+        with patch("src.services.export_service._build_docx", side_effect=RuntimeError("unexpected")):
+            with pytest.raises(ExportError, match="DOCX conversion failed.*unexpected"):
+                convert_markdown_to_docx("# Title")
+
+
+# ===================================================================
+# convert_markdown_to_pdf – integration tests (xhtml2pdf is pure Python)
+# ===================================================================
+
+
+class TestConvertMarkdownToPdf:
+    def test_produces_valid_pdf(self):
+        md = "# Title\n\nA paragraph."
+        result = convert_markdown_to_pdf(md)
+        assert isinstance(result, bytes)
+        assert result[:5] == b"%PDF-"
+
+    def test_pdf_is_nontrivial(self):
+        md = "# Title\n\nHello world from PDF test.\n\nSecond paragraph."
+        result = convert_markdown_to_pdf(md)
+        # Valid PDF with actual content should be significantly larger than empty
+        assert len(result) > 500
+
+    def test_pdf_renders_tables(self):
+        md = (
+            "| Col A | Col B |\n"
+            "|-------|-------|\n"
+            "| 1     | 2     |\n"
+        )
+        result = convert_markdown_to_pdf(md)
+        assert result[:5] == b"%PDF-"
+
+    def test_pdf_status_err_raises_export_error(self):
+        from unittest.mock import MagicMock
+
+        mock_status = MagicMock()
+        mock_status.err = 1
+
+        with patch("xhtml2pdf.pisa.CreatePDF", return_value=mock_status):
+            with pytest.raises(ExportError, match="PDF conversion returned errors"):
+                convert_markdown_to_pdf("# Title")
+
+    def test_pdf_generic_exception_wraps_as_export_error(self):
+        with patch("markdown.markdown", side_effect=RuntimeError("boom")):
+            with pytest.raises(ExportError, match="PDF conversion failed.*boom"):
+                convert_markdown_to_pdf("# Title")
+
+    def test_pdf_import_error_raises_export_error(self):
+        real_import = __import__
+
+        def fail_import(name, *args, **kwargs):
+            if name in ("xhtml2pdf", "markdown"):
+                raise ImportError(f"No module named '{name}'")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fail_import):
+            with pytest.raises(ExportError, match="PDF export requires"):
+                convert_markdown_to_pdf("# Title")
+
 
 # ===================================================================
 # _build_docx / _add_runs – unit tests
@@ -286,6 +359,15 @@ class TestBuildDocxHelpers:
         assert "Normal" in styles
         assert "List Bullet" in styles
         assert "List Number" in styles
+
+    def test_multi_line_paragraph(self):
+        doc = self._make_doc()
+        md = "First line of paragraph\nSecond line of paragraph\n\nNew paragraph here\n"
+        _build_docx(doc, md)
+        normal = [p for p in doc.paragraphs if p.style.name == "Normal"]
+        assert len(normal) == 2
+        assert normal[0].text == "First line of paragraph Second line of paragraph"
+        assert normal[1].text == "New paragraph here"
 
 
 # ===================================================================
