@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from src.services.section_definitions import get_boilerplate
 from src.services.section_graph import stream_section_regenerate, stream_sections_parallel
 
 router = APIRouter()
@@ -59,6 +60,11 @@ async def regenerate_section_endpoint(request: RegenerateSectionRequest):
 
     if not request.sectionName.strip():
         return _validation_error("sectionName is required")
+
+    if get_boilerplate(request.sectionName) is not None:
+        return _validation_error(
+            f"Cannot regenerate boilerplate section: {request.sectionName}"
+        )
 
     async def event_generator():
         async for event_str in stream_section_regenerate(

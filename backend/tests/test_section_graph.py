@@ -823,6 +823,149 @@ async def test_regen_succeeds_on_second_attempt(mock_get_model, mock_search):
     assert len(errors) == 0
 
 
+# --- Boilerplate sections in stream_sections_parallel ---
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.get_chat_model")
+async def test_stream_boilerplate_only_no_llm(mock_get_model):
+    """Boilerplate-only sections emit SSE events without calling get_chat_model."""
+    sections = [
+        {"id": "sec-1", "name": "Genetic Research"},
+        {"id": "sec-2", "name": "Adult Consent"},
+    ]
+
+    raw_events = []
+    async for event_str in stream_sections_parallel("proto-1", sections):
+        raw_events.append(event_str)
+
+    mock_get_model.assert_not_called()
+
+    events = _parse_sse_events(raw_events)
+
+    # Each boilerplate section should have start, chunk, complete
+    start_events = [e for e in events if e["event"] == "section_start"]
+    assert len(start_events) == 2
+
+    chunk_events = [e for e in events if e["event"] == "section_chunk"]
+    assert len(chunk_events) == 2
+    assert "[Boilerplate placeholder for Genetic Research]" in chunk_events[0]["data"]["content"]
+    assert "[Boilerplate placeholder for Adult Consent]" in chunk_events[1]["data"]["content"]
+
+    complete_events = [e for e in events if e["event"] == "section_complete"]
+    assert len(complete_events) == 2
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.build_section_graph")
+@patch("src.services.section_graph.get_chat_model")
+async def test_stream_mixed_boilerplate_and_llm(mock_get_model, mock_build_graph):
+    """Mixed list emits boilerplate first, then LLM sections. No double section_start."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_get_model.return_value = MagicMock()
+    node_results_ref = {}
+
+    async def fake_astream_events(input, version):
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "Purpose of the Study"},
+            "data": {"chunk": AIMessageChunk(content="LLM content")},
+        }
+        node_results_ref["sec-2"] = {
+            "content": "LLM content", "status": "ready", "error": None,
+        }
+        yield {
+            "event": "on_chain_end",
+            "metadata": {"langgraph_node": "Purpose of the Study"},
+            "data": {},
+        }
+
+    mock_graph = MagicMock()
+    mock_graph.astream_events = fake_astream_events
+
+    def build_side_effect(protocol_id, sections, model, node_results):
+        nonlocal node_results_ref
+        node_results_ref = node_results
+        return mock_graph
+
+    mock_build_graph.side_effect = build_side_effect
+
+    sections = [
+        {"id": "sec-1", "name": "Genetic Research"},
+        {"id": "sec-2", "name": "Purpose of the Study"},
+    ]
+    raw_events = []
+    async for event_str in stream_sections_parallel("proto-1", sections):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+
+    # Boilerplate section should have exactly one section_start (no double)
+    boilerplate_starts = [
+        e for e in events
+        if e["event"] == "section_start" and e["data"]["sectionId"] == "sec-1"
+    ]
+    assert len(boilerplate_starts) == 1
+
+    # LLM section should have exactly one section_start
+    llm_starts = [
+        e for e in events
+        if e["event"] == "section_start" and e["data"]["sectionId"] == "sec-2"
+    ]
+    assert len(llm_starts) == 1
+
+    # Boilerplate events come before LLM events
+    boilerplate_complete_idx = next(
+        i for i, e in enumerate(events)
+        if e["event"] == "section_complete" and e["data"]["sectionId"] == "sec-1"
+    )
+    llm_start_idx = next(
+        i for i, e in enumerate(events)
+        if e["event"] == "section_start" and e["data"]["sectionId"] == "sec-2"
+    )
+    assert boilerplate_complete_idx < llm_start_idx
+
+    # build_section_graph should only receive LLM sections
+    call_args = mock_build_graph.call_args
+    graph_sections = call_args[0][1]
+    assert len(graph_sections) == 1
+    assert graph_sections[0]["name"] == "Purpose of the Study"
+
+
+@pytest.mark.asyncio
+@patch("src.services.section_graph.search_protocol")
+@patch("src.services.section_graph.get_chat_model")
+async def test_stream_standard_only_unchanged(mock_get_model, mock_search):
+    """Standard-only sections behave the same as before (LLM generation)."""
+    from langchain_core.messages import AIMessageChunk
+
+    mock_search.return_value = ["Protocol content"]
+    model = AsyncMock()
+
+    async def fake_astream(messages):
+        yield AIMessageChunk(content="Generated content")
+
+    model.astream = fake_astream
+    model.bind = MagicMock(return_value=model)
+    mock_get_model.return_value = model
+
+    sections = [{"id": "sec-1", "name": "Purpose of the Study"}]
+
+    raw_events = []
+    async for event_str in stream_sections_parallel("proto-1", sections):
+        raw_events.append(event_str)
+
+    events = _parse_sse_events(raw_events)
+    start_events = [e for e in events if e["event"] == "section_start"]
+    assert len(start_events) == 1
+
+    complete_events = [e for e in events if e["event"] == "section_complete"]
+    assert len(complete_events) == 1
+
+    mock_get_model.assert_called_once()
+
+
 @pytest.mark.asyncio
 @patch("src.services.section_graph.search_protocol")
 @patch("src.services.section_graph.get_chat_model")

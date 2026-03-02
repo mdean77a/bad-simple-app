@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
 from src.services.llm_factory import LLMConfigError, get_chat_model
+from src.services.section_definitions import get_boilerplate
 from src.services.vector_store import VectorStoreError, search_protocol
 
 logger = logging.getLogger(__name__)
@@ -262,13 +263,40 @@ async def stream_sections_parallel(
 ) -> AsyncGenerator[str, None]:
     """Yield formatted SSE event strings for all sections in parallel.
 
-    Uses a LangGraph StateGraph with fan-out to run all section generation
-    nodes in parallel. Token-level streaming is captured via astream_events.
+    Boilerplate sections (conditional/signature) are emitted instantly.
+    LLM sections use a LangGraph StateGraph with fan-out for parallel generation.
     """
+    # Split into boilerplate vs LLM sections
+    boilerplate_sections: list[tuple[dict, str]] = []
+    llm_sections: list[dict] = []
+    for s in sections:
+        bp = get_boilerplate(s["name"])
+        if bp is not None:
+            boilerplate_sections.append((s, bp))
+        else:
+            llm_sections.append(s)
+
+    # Emit boilerplate sections instantly
+    for s, bp_text in boilerplate_sections:
+        yield _sse_event(
+            "section_start", {"sectionId": s["id"], "name": s["name"]}
+        )
+        yield _sse_event(
+            "section_chunk",
+            {"sectionId": s["id"], "content": bp_text},
+        )
+        yield _sse_event(
+            "section_complete", {"sectionId": s["id"], "status": "ready"}
+        )
+
+    # If no LLM sections, we're done
+    if not llm_sections:
+        return
+
     try:
         model = get_chat_model()
     except LLMConfigError as exc:
-        for s in sections:
+        for s in llm_sections:
             yield _sse_event(
                 "section_start", {"sectionId": s["id"], "name": s["name"]}
             )
@@ -279,11 +307,11 @@ async def stream_sections_parallel(
         return
 
     node_results: dict[str, dict] = {}
-    graph = build_section_graph(protocol_id, sections, model, node_results)
-    name_to_id = {s["name"]: s["id"] for s in sections}
+    graph = build_section_graph(protocol_id, llm_sections, model, node_results)
+    name_to_id = {s["name"]: s["id"] for s in llm_sections}
 
-    # Emit section_start for all sections upfront
-    for s in sections:
+    # Emit section_start for LLM sections upfront
+    for s in llm_sections:
         yield _sse_event(
             "section_start", {"sectionId": s["id"], "name": s["name"]}
         )
@@ -324,8 +352,8 @@ async def stream_sections_parallel(
                         },
                     )
 
-    # Safety net: emit for any sections not caught during streaming
-    for s in sections:
+    # Safety net: emit for any LLM sections not caught during streaming
+    for s in llm_sections:
         if s["id"] not in completed_sections:
             result = node_results.get(s["id"], {})
             if result.get("status") == "ready":

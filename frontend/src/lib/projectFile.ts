@@ -121,6 +121,9 @@ export function serializeProject(
       if (s.approval) {
         section.approval = { ...s.approval };
       }
+      if (s.category) {
+        section.category = s.category;
+      }
       return section;
     }),
   };
@@ -148,6 +151,7 @@ export function deserializeProject(file: ProjectFile): ProjectState {
       status: s.status,
       originalPrompt: s.originalPrompt,
       ...(s.approval ? { approval: { ...s.approval } } : {}),
+      ...(s.category ? { category: s.category } : {}),
     })),
     generatedOutline: null,
   };

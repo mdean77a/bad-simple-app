@@ -14,6 +14,7 @@ class SectionDef:
 
     name: str
     detection_guidance: str
+    boilerplate_text: str | None = None
 
 
 # --- Standard Sections (always included, defaultChecked=true) ---
@@ -66,6 +67,7 @@ CONDITIONAL_SECTIONS: list[SectionDef] = [
             "Include if protocol mentions genetic testing, DNA, "
             "genomic analysis, or genetic sample collection"
         ),
+        boilerplate_text="[Boilerplate placeholder for Genetic Research]",
     ),
     SectionDef(
         name="Sample Storage",
@@ -73,12 +75,14 @@ CONDITIONAL_SECTIONS: list[SectionDef] = [
             "Include if protocol mentions biobanking, sample/tissue storage, "
             "or future use of biological samples"
         ),
+        boilerplate_text="[Boilerplate placeholder for Sample Storage]",
     ),
     SectionDef(
         name="HIV Testing",
         detection_guidance=(
             "Include if protocol mentions HIV testing or HIV status determination"
         ),
+        boilerplate_text="[Boilerplate placeholder for HIV Testing]",
     ),
 ]
 
@@ -91,6 +95,7 @@ SIGNATURE_SECTIONS: list[SectionDef] = [
             "Include (defaultChecked=true) if protocol includes "
             "adult participants (18+)"
         ),
+        boilerplate_text="[Boilerplate placeholder for Adult Consent]",
     ),
     SectionDef(
         name="Teen Assent",
@@ -100,6 +105,7 @@ SIGNATURE_SECTIONS: list[SectionDef] = [
             "minors (under 18) and does NOT exclude 12-17 year olds, "
             "Teen Assent IS needed — 'under 18' includes teens."
         ),
+        boilerplate_text="[Boilerplate placeholder for Teen Assent]",
     ),
     SectionDef(
         name="Parent/Guardian Permission",
@@ -107,6 +113,7 @@ SIGNATURE_SECTIONS: list[SectionDef] = [
             "Include (defaultChecked=true) if protocol includes "
             "any minor participants (under 18)"
         ),
+        boilerplate_text="[Boilerplate placeholder for Parent/Guardian Permission]",
     ),
 ]
 
@@ -116,3 +123,14 @@ ALL_SECTIONS: list[tuple[str, SectionDef]] = (
     + [("conditional", s) for s in CONDITIONAL_SECTIONS]
     + [("signature", s) for s in SIGNATURE_SECTIONS]
 )
+
+_BOILERPLATE_MAP: dict[str, str] = {
+    section_def.name: section_def.boilerplate_text
+    for _category, section_def in ALL_SECTIONS
+    if section_def.boilerplate_text is not None
+}
+
+
+def get_boilerplate(section_name: str) -> str | None:
+    """Return boilerplate text for a section, or None if it's LLM-generated."""
+    return _BOILERPLATE_MAP.get(section_name)

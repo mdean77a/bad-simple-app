@@ -99,13 +99,17 @@ export default function OutlinePage() {
       confirmedBy: { name: user.name, email: user.email },
     };
 
-    const sections: SectionState[] = selectedSections.map((name) => ({
-      id: crypto.randomUUID(),
-      name,
-      content: "",
-      status: "generating" as const,
-      originalPrompt: "",
-    }));
+    const sections: SectionState[] = selectedSections.map((name) => {
+      const outlineSection = state.sections.find((s) => s.sectionName === name);
+      return {
+        id: crypto.randomUUID(),
+        name,
+        content: "",
+        status: "generating" as const,
+        originalPrompt: "",
+        category: outlineSection?.category ?? "standard",
+      };
+    });
 
     confirmOutline(protocolId, outline, sections);
     router.push(`/projects/${protocolId}`);

@@ -430,4 +430,61 @@ describe("SectionCard", () => {
     const btn = screen.getByRole("button", { name: /regenerate study procedures/i });
     expect(btn).toBeDisabled();
   });
+
+  // --- Category-based Regenerate button visibility ---
+
+  it("renders Regenerate button when category is 'standard'", () => {
+    const section: SectionState = { ...readySection, category: "standard" };
+    render(<SectionCard section={section} />);
+    expect(
+      screen.getByRole("button", { name: /regenerate purpose/i })
+    ).toBeInTheDocument();
+  });
+
+  it("renders Regenerate button when category is undefined (backward compat)", () => {
+    const section: SectionState = { ...readySection };
+    delete section.category;
+    render(<SectionCard section={section} />);
+    expect(
+      screen.getByRole("button", { name: /regenerate purpose/i })
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT render Regenerate button when category is 'conditional'", () => {
+    const section: SectionState = { ...readySection, category: "conditional" };
+    render(<SectionCard section={section} />);
+    expect(
+      screen.queryByRole("button", { name: /regenerate purpose/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("does NOT render Regenerate button when category is 'signature'", () => {
+    const section: SectionState = { ...readySection, category: "signature" };
+    render(<SectionCard section={section} />);
+    expect(
+      screen.queryByRole("button", { name: /regenerate purpose/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("Approve and Edit buttons remain visible for conditional sections", () => {
+    const section: SectionState = { ...readySection, category: "conditional" };
+    render(<SectionCard section={section} />);
+    expect(
+      screen.getByRole("button", { name: /approve purpose/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /edit purpose/i })
+    ).toBeInTheDocument();
+  });
+
+  it("Approve and Edit buttons remain visible for signature sections", () => {
+    const section: SectionState = { ...readySection, category: "signature" };
+    render(<SectionCard section={section} />);
+    expect(
+      screen.getByRole("button", { name: /approve purpose/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /edit purpose/i })
+    ).toBeInTheDocument();
+  });
 });

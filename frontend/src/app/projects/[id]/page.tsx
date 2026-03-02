@@ -240,7 +240,7 @@ export default function DashboardPage() {
                   onEdit={() => handleEdit(section.id)}
                   onSave={(content) => handleSave(section.id, content)}
                   onCancel={() => handleCancel(section.id)}
-                  onRegenerate={() => setRegenSection(section)}
+                  onRegenerate={!section.category || section.category === "standard" ? () => setRegenSection(section) : undefined}
                 />
               ))}
             </div>

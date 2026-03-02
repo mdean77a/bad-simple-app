@@ -390,6 +390,46 @@ async def test_regenerate_section_missing_required_fields(client):
 
 
 @pytest.mark.asyncio
+async def test_regenerate_boilerplate_section_returns_422(client):
+    """Regenerating a boilerplate section returns 422."""
+    payload = {**REGEN_PAYLOAD, "sectionName": "Genetic Research"}
+    response = await client.post("/api/v1/sections/regenerate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["code"] == "VALIDATION_ERROR"
+    assert "Cannot regenerate boilerplate section" in data["detail"]
+    assert "Genetic Research" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_regenerate_signature_boilerplate_returns_422(client):
+    """Regenerating a signature boilerplate section returns 422."""
+    payload = {**REGEN_PAYLOAD, "sectionName": "Adult Consent"}
+    response = await client.post("/api/v1/sections/regenerate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert "Cannot regenerate boilerplate section" in data["detail"]
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.sections.stream_section_regenerate")
+async def test_regenerate_standard_section_still_works(mock_stream, client):
+    """Standard section name is not blocked by boilerplate guard."""
+
+    async def fake_stream(**kwargs):
+        sid = kwargs["section_id"]
+        yield _sse_event("section_start", {"sectionId": sid, "name": kwargs["section_name"]})
+        yield _sse_event("section_complete", {"sectionId": sid, "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
+
+    response = await client.post("/api/v1/sections/regenerate", json=REGEN_PAYLOAD)
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
 @patch("src.api.routes.sections.stream_section_regenerate")
 async def test_regenerate_section_sse_format(mock_stream, client):
     """SSE events have correct format with event: and data: lines."""
