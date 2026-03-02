@@ -247,6 +247,22 @@ describe("serializeProject", () => {
     const file = serializeProject(state);
     expect(file.sections).toEqual([]);
   });
+
+  it("includes category in output when present on SectionState", () => {
+    const state = makeProjectState({
+      sections: [makeSection({ category: "conditional" })],
+    });
+    const file = serializeProject(state);
+    expect(file.sections[0].category).toBe("conditional");
+  });
+
+  it("omits category from output when undefined on SectionState", () => {
+    const state = makeProjectState({
+      sections: [makeSection()],
+    });
+    const file = serializeProject(state);
+    expect(file.sections[0].category).toBeUndefined();
+  });
 });
 
 // ===========================================================================
@@ -322,6 +338,29 @@ describe("deserializeProject", () => {
     const file = makeValidProjectFile({ sections: [] });
     const state = deserializeProject(file);
     expect(state.sections).toEqual([]);
+  });
+
+  it("restores category from ProjectFile when present", () => {
+    const file = makeValidProjectFile({
+      sections: [
+        {
+          id: "sec-1",
+          name: "Genetic Research",
+          content: "Boilerplate text.",
+          status: "ready",
+          originalPrompt: "",
+          category: "conditional",
+        },
+      ],
+    });
+    const state = deserializeProject(file);
+    expect(state.sections[0].category).toBe("conditional");
+  });
+
+  it("produces SectionState without category when field is absent in file (backward compat)", () => {
+    const file = makeValidProjectFile();
+    const state = deserializeProject(file);
+    expect(state.sections[0].category).toBeUndefined();
   });
 });
 

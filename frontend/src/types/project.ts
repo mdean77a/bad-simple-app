@@ -22,6 +22,7 @@ export interface SectionState {
   status: SectionStatus;
   originalPrompt: string;
   approval?: SectionApproval;
+  category?: "standard" | "conditional" | "signature";
 }
 
 export interface ConfirmedOutline {
@@ -60,6 +61,7 @@ export interface ProjectFileSection {
   status: PersistableStatus;
   originalPrompt: string;
   approval?: SectionApproval;
+  category?: "standard" | "conditional" | "signature";
 }
 
 export interface ProjectFileOutline {

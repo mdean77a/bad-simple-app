@@ -774,6 +774,102 @@ describe("Dashboard Page", () => {
     });
   });
 
+  // --- Boilerplate / category tests ---
+
+  it("does not show Regenerate button for conditional sections on dashboard", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const conditionalSections: SectionState[] = [
+      {
+        id: "uuid-cond",
+        name: "Genetic Research",
+        content: "[Boilerplate placeholder for Genetic Research]",
+        status: "ready",
+        originalPrompt: "",
+        category: "conditional",
+      },
+    ];
+    renderWithSections(conditionalSections);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 3, name: "Genetic Research" })
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("button", { name: /regenerate genetic research/i })
+    ).not.toBeInTheDocument();
+    // Approve and Edit should still be present
+    expect(
+      screen.getByRole("button", { name: /approve genetic research/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /edit genetic research/i })
+    ).toBeInTheDocument();
+  });
+
+  it("does not show Regenerate button for signature sections on dashboard", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const signatureSections: SectionState[] = [
+      {
+        id: "uuid-sig",
+        name: "Adult Consent",
+        content: "[Boilerplate placeholder for Adult Consent]",
+        status: "ready",
+        originalPrompt: "",
+        category: "signature",
+      },
+    ];
+    renderWithSections(signatureSections);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 3, name: "Adult Consent" })
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("button", { name: /regenerate adult consent/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows Regenerate button for standard sections on dashboard", async () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ name: "Jane", email: "jane@example.com" })
+    );
+
+    const standardSections: SectionState[] = [
+      {
+        id: "uuid-std",
+        name: "Purpose of the Study",
+        content: "LLM generated content.",
+        status: "ready",
+        originalPrompt: "",
+        category: "standard",
+      },
+    ];
+    renderWithSections(standardSections);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 3, name: "Purpose of the Study" })
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("button", { name: /regenerate purpose/i })
+    ).toBeInTheDocument();
+  });
+
   it("renders empty state when sections array is empty", async () => {
     localStorage.setItem(
       "user",
