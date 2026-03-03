@@ -105,7 +105,23 @@ SIGNATURE_SECTIONS: list[SectionDef] = [
             "minors (under 18) and does NOT exclude 12-17 year olds, "
             "Teen Assent IS needed — 'under 18' includes teens."
         ),
-        boilerplate_text="[Boilerplate placeholder for Teen Assent]",
+        boilerplate_text=(
+            "I confirm that I have read this assent document and have had "
+            "the opportunity to ask questions. I will be given a signed "
+            "copy of the assent and authorization form to keep.\n\n"
+            "______________________________\n"
+            "Printed Name of Child\n\n"
+            "______________________________\n"
+            "Signature of Child\n\n"
+            "______________________________\n"
+            "Date\n\n"
+            "______________________________\n"
+            "Name of Person Obtaining Assent\n\n"
+            "______________________________\n"
+            "Signature of Person Obtaining Assent\n\n"
+            "______________________________\n"
+            "Date"
+        ),
     ),
     SectionDef(
         name="Parent/Guardian Permission",
@@ -113,7 +129,31 @@ SIGNATURE_SECTIONS: list[SectionDef] = [
             "Include (defaultChecked=true) if protocol includes "
             "any minor participants (under 18)"
         ),
-        boilerplate_text="[Boilerplate placeholder for Parent/Guardian Permission]",
+        boilerplate_text=(
+            "I confirm that I have read this parental permission document "
+            "and have had the opportunity to ask questions. I will be given "
+            "a signed copy of the parental permission form to keep.\n\n"
+            "**I agree to allow my child to participate in this research "
+            "study and authorize you to use and disclose health information "
+            "about my child for this study, as you have explained in this "
+            "document.**\n\n"
+            "______________________________\n"
+            "Child's Name\n\n"
+            "______________________________\n"
+            "Parent/Guardian's Name\n\n"
+            "______________________________\n"
+            "Parent/Guardian's Signature\n\n"
+            "______________________________\n"
+            "Date\n\n"
+            "______________________________\n"
+            "Relationship to Child for Parent/Guardian\n\n"
+            "______________________________\n"
+            "Name of Person Obtaining Authorization and Consent\n\n"
+            "______________________________\n"
+            "Signature of Person Obtaining Authorization and Consent\n\n"
+            "______________________________\n"
+            "Date"
+        ),
     ),
 ]
 

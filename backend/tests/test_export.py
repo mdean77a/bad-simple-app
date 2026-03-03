@@ -6,8 +6,10 @@ from unittest.mock import patch
 import pytest
 
 from src.services.export_service import (
+    _PAGE_BREAK_MARKER,
     ExportError,
     _add_runs,
+    _add_table,
     _build_docx,
     _format_timestamp,
     assemble_markdown,
@@ -100,6 +102,30 @@ class TestAssembleMarkdown:
         result = assemble_markdown(sections, "P")
         assert "## Empty" in result
 
+    def test_page_break_before_signature_sections(self):
+        sections = [
+            {"id": "s1", "name": "Benefits", "content": "Some benefits."},
+            {"id": "s2", "name": "Adult Consent", "content": "Sign here."},
+            {"id": "s3", "name": "Teen Assent", "content": "Assent text."},
+        ]
+        result = assemble_markdown(sections, "P", page_break_before={"Adult Consent", "Teen Assent"})
+        # Marker should appear before each signature section
+        assert f"{_PAGE_BREAK_MARKER}\n\n## Adult Consent" in result
+        assert f"{_PAGE_BREAK_MARKER}\n\n## Teen Assent" in result
+        # No marker before content sections
+        assert f"{_PAGE_BREAK_MARKER}\n\n## Benefits" not in result
+
+    def test_no_page_break_when_param_omitted(self):
+        sections = [
+            {"id": "s1", "name": "Adult Consent", "content": "Sign here."},
+        ]
+        result = assemble_markdown(sections, "P")
+        assert _PAGE_BREAK_MARKER not in result
+
+    def test_page_break_does_not_affect_unmatched_sections(self):
+        result = assemble_markdown(_SECTIONS, "P", page_break_before={"Adult Consent"})
+        assert _PAGE_BREAK_MARKER not in result
+
 
 # ===================================================================
 # build_approval_tracking / _format_timestamp – unit tests
@@ -136,9 +162,9 @@ class TestBuildApprovalTracking:
     def test_empty_approvals_returns_empty(self):
         assert build_approval_tracking([], _SECTIONS) == ""
 
-    def test_starts_with_horizontal_rule(self):
+    def test_starts_with_page_break_marker(self):
         result = build_approval_tracking(_APPROVALS, _SECTIONS)
-        assert result.startswith("---")
+        assert result.startswith(_PAGE_BREAK_MARKER)
 
     def test_unknown_section_id_uses_id_as_fallback(self):
         approvals = [
@@ -225,13 +251,22 @@ class TestConvertMarkdownToDocx:
         italic_runs = [r for r in para.runs if r.italic]
         assert any("emphasized" in r.text for r in italic_runs)
 
-    def test_horizontal_rule_produces_page_break(self):
-        md = "# Page 1\n\n---\n\n# Page 2\n"
+    def test_page_break_marker_produces_page_break(self):
+        md = f"# Page 1\n\n{_PAGE_BREAK_MARKER}\n\n# Page 2\n"
         doc = self._open_docx(convert_markdown_to_docx(md))
         # Page breaks appear as paragraph elements; just verify both headings exist
         texts = [p.text for p in doc.paragraphs]
         assert "Page 1" in texts
         assert "Page 2" in texts
+
+    def test_thematic_break_in_content_skipped(self):
+        """--- or *** in LLM content should NOT produce a page break."""
+        md = "# Title\n\nParagraph A.\n\n---\n\nParagraph B.\n\n***\n\nParagraph C.\n"
+        doc = self._open_docx(convert_markdown_to_docx(md))
+        texts = [p.text for p in doc.paragraphs if p.style.name == "Normal"]
+        assert any("Paragraph A" in t for t in texts)
+        assert any("Paragraph B" in t for t in texts)
+        assert any("Paragraph C" in t for t in texts)
 
     def test_full_document_assembly(self):
         md = assemble_markdown(_SECTIONS, "My Protocol")
@@ -240,6 +275,38 @@ class TestConvertMarkdownToDocx:
         assert "My Protocol" in texts
         assert "Purpose of the Study" in texts
         assert "Study Procedures" in texts
+
+    def test_table_renders_as_word_table(self):
+        md = (
+            "| Section | Approved By | Date |\n"
+            "|---------|-------------|------|\n"
+            "| Purpose | Sarah | Feb 3 |\n"
+            "| Risks | John | Feb 4 |\n"
+        )
+        doc = self._open_docx(convert_markdown_to_docx(md))
+        assert len(doc.tables) == 1
+        table = doc.tables[0]
+        assert len(table.rows) == 3  # header + 2 data rows
+        assert len(table.columns) == 3
+        # Header row should be bold
+        header_cells = [cell.text for cell in table.rows[0].cells]
+        assert header_cells == ["Section", "Approved By", "Date"]
+        assert table.rows[0].cells[0].paragraphs[0].runs[0].bold
+        # Data rows
+        assert table.rows[1].cells[0].text == "Purpose"
+        assert table.rows[2].cells[1].text == "John"
+
+    def test_table_in_full_document(self):
+        md = (
+            "## Approval Tracking\n\n"
+            "| Section | Approved By |\n"
+            "|---------|-------------|\n"
+            "| Purpose | Sarah |\n"
+        )
+        doc = self._open_docx(convert_markdown_to_docx(md))
+        assert len(doc.tables) == 1
+        texts = [p.text for p in doc.paragraphs]
+        assert "Approval Tracking" in texts
 
     def test_import_error_raises_export_error(self):
         real_import = __import__
@@ -313,6 +380,31 @@ class TestConvertMarkdownToPdf:
             with pytest.raises(ExportError, match="PDF export requires"):
                 convert_markdown_to_pdf("# Title")
 
+    def test_underscore_lines_not_treated_as_page_breaks(self):
+        """Underscore signature lines should render as lines, not <hr>."""
+        md = "## Teen Assent\n\nSign below:\n\n______________________________\nName\n"
+        # Should produce a valid PDF without errors
+        result = convert_markdown_to_pdf(md)
+        assert result[:5] == b"%PDF-"
+
+    def test_page_break_marker_in_pdf(self):
+        """Page-break marker should produce a valid PDF."""
+        md = f"## Section A\n\nContent.\n\n{_PAGE_BREAK_MARKER}\n\n## Section B\n\nMore.\n"
+        result = convert_markdown_to_pdf(md)
+        assert result[:5] == b"%PDF-"
+
+    def test_asterisk_thematic_break_stripped(self):
+        """*** in LLM content should not produce an <hr> or page break."""
+        md = "## Risks\n\nRisk A.\n\n***\n\nRisk B.\n"
+        result = convert_markdown_to_pdf(md)
+        assert result[:5] == b"%PDF-"
+
+    def test_dash_thematic_break_stripped(self):
+        """--- in LLM content should not produce an <hr> or page break."""
+        md = "## Procedures\n\nStep A.\n\n---\n\nStep B.\n"
+        result = convert_markdown_to_pdf(md)
+        assert result[:5] == b"%PDF-"
+
 
 # ===================================================================
 # _build_docx / _add_runs – unit tests
@@ -368,6 +460,43 @@ class TestBuildDocxHelpers:
         assert len(normal) == 2
         assert normal[0].text == "First line of paragraph Second line of paragraph"
         assert normal[1].text == "New paragraph here"
+
+    def test_build_docx_table(self):
+        doc = self._make_doc()
+        md = (
+            "| A | B |\n"
+            "|---|---|\n"
+            "| 1 | 2 |\n"
+        )
+        _build_docx(doc, md)
+        assert len(doc.tables) == 1
+        assert len(doc.tables[0].rows) == 2  # header + 1 data
+        assert doc.tables[0].rows[0].cells[0].text == "A"
+        assert doc.tables[0].rows[1].cells[1].text == "2"
+
+    def test_build_docx_table_then_paragraph(self):
+        doc = self._make_doc()
+        md = (
+            "| X | Y |\n"
+            "|---|---|\n"
+            "| a | b |\n"
+            "\nAfter table.\n"
+        )
+        _build_docx(doc, md)
+        assert len(doc.tables) == 1
+        normal = [p for p in doc.paragraphs if p.style.name == "Normal"]
+        assert any("After table" in p.text for p in normal)
+
+    def test_add_table_header_bold(self):
+        doc = self._make_doc()
+        _add_table(doc, [["Col1", "Col2"], ["a", "b"]])
+        assert doc.tables[0].rows[0].cells[0].paragraphs[0].runs[0].bold
+        assert not doc.tables[0].rows[1].cells[0].paragraphs[0].runs[0].bold
+
+    def test_add_table_empty_rows_noop(self):
+        doc = self._make_doc()
+        _add_table(doc, [])
+        assert len(doc.tables) == 0
 
 
 # ===================================================================

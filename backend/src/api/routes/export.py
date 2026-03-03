@@ -14,6 +14,7 @@ from src.services.export_service import (
     convert_markdown_to_docx,
     convert_markdown_to_pdf,
 )
+from src.services.section_definitions import SIGNATURE_SECTIONS
 
 router = APIRouter()
 
@@ -77,7 +78,8 @@ async def export_document(req: ExportRequest):
         for s in req.sections
     ]
 
-    md_content = assemble_markdown(sections, protocol_name)
+    signature_names = {s.name for s in SIGNATURE_SECTIONS}
+    md_content = assemble_markdown(sections, protocol_name, page_break_before=signature_names)
 
     approvals = [
         {

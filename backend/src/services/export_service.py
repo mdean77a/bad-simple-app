@@ -9,6 +9,11 @@ class ExportError(Exception):
     """Raised when export processing fails."""
 
 
+# Unique marker that cannot appear in LLM-generated content.
+# Converters replace it with the format-appropriate page break.
+_PAGE_BREAK_MARKER = "<!-- pagebreak -->"
+
+
 # ---------------------------------------------------------------------------
 # Markdown assembly
 # ---------------------------------------------------------------------------
@@ -17,14 +22,20 @@ class ExportError(Exception):
 def assemble_markdown(
     sections: list[dict[str, str]],
     protocol_name: str,
+    page_break_before: set[str] | None = None,
 ) -> str:
     """Assemble sections into a complete Markdown document.
 
     Each section dict must have ``name`` and ``content`` keys.
+    *page_break_before* is an optional set of section names that should
+    be preceded by a page-break marker.
     """
     parts: list[str] = [f"# {protocol_name}", "", "**Informed Consent Form**", ""]
 
     for section in sections:
+        if page_break_before and section["name"] in page_break_before:
+            parts.append(_PAGE_BREAK_MARKER)
+            parts.append("")
         parts.append(f"## {section['name']}")
         parts.append("")
         parts.append(section["content"])
@@ -60,7 +71,7 @@ def build_approval_tracking(
         rows.append(f"| {name} | {a['userName']} | {ts} |")
 
     lines = [
-        "---",
+        _PAGE_BREAK_MARKER,
         "",
         "## Approval Tracking",
         "",
@@ -121,8 +132,9 @@ th {
     background-color: #f0f0f0;
 }
 hr {
-    page-break-after: always;
     border: none;
+    border-top: 1px solid #ccc;
+    margin: 1.5em 0;
 }
 """
 
@@ -138,6 +150,31 @@ def convert_markdown_to_pdf(md_content: str) -> bytes:
         ) from exc
 
     try:
+        # 1) Replace our unique page-break marker with an HTML page break.
+        md_content = md_content.replace(
+            _PAGE_BREAK_MARKER,
+            '<div style="page-break-after: always;"></div>',
+        )
+        # 2) Neutralise ALL Markdown thematic breaks (---, ***, ___) that
+        #    may appear in LLM-generated content so the markdown library
+        #    does not convert them to <hr> (which would waste vertical
+        #    space or trigger unwanted page breaks in some renderers).
+        #    Underscore lines are signature lines — render as a visible line.
+        md_content = re.sub(
+            r"^_{3,}\s*$",
+            '<div style="border-bottom: 1px solid black; width: 50%;'
+            ' margin: 0.5em 0;"></div>',
+            md_content,
+            flags=re.MULTILINE,
+        )
+        #    Dash and asterisk thematic breaks — remove entirely.
+        md_content = re.sub(
+            r"^[-*]{3,}\s*$",
+            "",
+            md_content,
+            flags=re.MULTILINE,
+        )
+
         html_body = md_lib.markdown(
             md_content,
             extensions=["tables", "fenced_code", "sane_lists"],
@@ -198,7 +235,9 @@ def convert_markdown_to_docx(md_content: str) -> bytes:
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$")
 _BULLET_RE = re.compile(r"^[-*]\s+(.+)$")
 _NUMBERED_RE = re.compile(r"^\d+\.\s+(.+)$")
-_HRULE_RE = re.compile(r"^-{3,}\s*$")
+_HRULE_RE = re.compile(r"^[-*]{3,}\s*$")
+_TABLE_ROW_RE = re.compile(r"^\|.+\|$")
+_TABLE_SEP_RE = re.compile(r"^\|[-:\s|]+\|$")
 _INLINE_RE = re.compile(r"(\*\*\*.+?\*\*\*|\*\*.+?\*\*|\*.+?\*)")
 
 
@@ -214,9 +253,14 @@ def _build_docx(doc, md_content: str) -> None:  # noqa: ANN001
             i += 1
             continue
 
-        # Horizontal rule → page break
-        if _HRULE_RE.match(stripped):
+        # Intentional page-break marker
+        if stripped == _PAGE_BREAK_MARKER:
             doc.add_page_break()
+            i += 1
+            continue
+
+        # Thematic breaks (---, ***) from LLM content — skip silently
+        if _HRULE_RE.match(stripped):
             i += 1
             continue
 
@@ -244,6 +288,21 @@ def _build_docx(doc, md_content: str) -> None:  # noqa: ANN001
             i += 1
             continue
 
+        # Markdown table
+        if _TABLE_ROW_RE.match(stripped):
+            table_rows: list[list[str]] = []
+            while i < len(lines) and _TABLE_ROW_RE.match(lines[i].strip()):
+                row_line = lines[i].strip()
+                if _TABLE_SEP_RE.match(row_line):
+                    i += 1
+                    continue
+                cells = [c.strip() for c in row_line.strip("|").split("|")]
+                table_rows.append(cells)
+                i += 1
+            if table_rows:
+                _add_table(doc, table_rows)
+            continue
+
         # Regular paragraph – accumulate consecutive non-special lines
         para_lines = [stripped]
         i += 1
@@ -251,10 +310,12 @@ def _build_docx(doc, md_content: str) -> None:  # noqa: ANN001
             nxt = lines[i].strip()
             if (
                 not nxt
+                or nxt == _PAGE_BREAK_MARKER
                 or _HEADING_RE.match(nxt)
                 or _BULLET_RE.match(nxt)
                 or _NUMBERED_RE.match(nxt)
                 or _HRULE_RE.match(nxt)
+                or _TABLE_ROW_RE.match(nxt)
             ):
                 break
             para_lines.append(nxt)
@@ -262,6 +323,26 @@ def _build_docx(doc, md_content: str) -> None:  # noqa: ANN001
 
         p = doc.add_paragraph()
         _add_runs(p, " ".join(para_lines))
+
+
+def _add_table(doc, rows: list[list[str]]) -> None:  # noqa: ANN001
+    """Add a Word table from parsed Markdown table rows.
+
+    The first row is treated as the header.
+    """
+    if not rows:
+        return
+    n_cols = len(rows[0])
+    table = doc.add_table(rows=len(rows), cols=n_cols, style="Table Grid")
+    for r_idx, cells in enumerate(rows):
+        for c_idx, cell_text in enumerate(cells):
+            if c_idx < n_cols:
+                cell = table.rows[r_idx].cells[c_idx]
+                p = cell.paragraphs[0]
+                p.clear()
+                run = p.add_run(cell_text)
+                if r_idx == 0:
+                    run.bold = True
 
 
 def _add_runs(paragraph, text: str) -> None:  # noqa: ANN001
