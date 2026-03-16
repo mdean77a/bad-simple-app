@@ -67,7 +67,6 @@ CONDITIONAL_SECTIONS: list[SectionDef] = [
             "Include if protocol mentions genetic testing, DNA, "
             "genomic analysis, or genetic sample collection"
         ),
-        boilerplate_text="[Boilerplate placeholder for Genetic Research]",
     ),
     SectionDef(
         name="Sample Storage",
@@ -75,14 +74,12 @@ CONDITIONAL_SECTIONS: list[SectionDef] = [
             "Include if protocol mentions biobanking, sample/tissue storage, "
             "or future use of biological samples"
         ),
-        boilerplate_text="[Boilerplate placeholder for Sample Storage]",
     ),
     SectionDef(
         name="HIV Testing",
         detection_guidance=(
             "Include if protocol mentions HIV testing or HIV status determination"
         ),
-        boilerplate_text="[Boilerplate placeholder for HIV Testing]",
     ),
 ]
 
