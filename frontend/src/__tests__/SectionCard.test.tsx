@@ -450,12 +450,12 @@ describe("SectionCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("does NOT render Regenerate button when category is 'conditional'", () => {
+  it("renders Regenerate button when category is 'conditional'", () => {
     const section: SectionState = { ...readySection, category: "conditional" };
     render(<SectionCard section={section} />);
     expect(
-      screen.queryByRole("button", { name: /regenerate purpose/i })
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: /regenerate purpose/i })
+    ).toBeInTheDocument();
   });
 
   it("does NOT render Regenerate button when category is 'signature'", () => {

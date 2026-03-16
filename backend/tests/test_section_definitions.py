@@ -14,12 +14,10 @@ from src.services.section_definitions import (
 
 
 def test_get_boilerplate_conditional_sections():
-    """get_boilerplate returns non-None for each conditional section."""
+    """get_boilerplate returns None for each conditional section (LLM-generated)."""
     for section_def in CONDITIONAL_SECTIONS:
         result = get_boilerplate(section_def.name)
-        assert result is not None, f"Expected boilerplate for '{section_def.name}'"
-        assert isinstance(result, str)
-        assert len(result) > 0
+        assert result is None, f"Expected None for conditional section '{section_def.name}'"
 
 
 def test_get_boilerplate_signature_sections():
@@ -44,9 +42,9 @@ def test_get_boilerplate_unknown_section_returns_none():
 
 
 def test_get_boilerplate_specific_conditional_names():
-    """Verify specific conditional section names return boilerplate."""
+    """Verify specific conditional section names return None (LLM-generated)."""
     for name in ["Genetic Research", "Sample Storage", "HIV Testing"]:
-        assert get_boilerplate(name) is not None
+        assert get_boilerplate(name) is None
 
 
 def test_get_boilerplate_specific_signature_names():
@@ -58,11 +56,11 @@ def test_get_boilerplate_specific_signature_names():
 # --- boilerplate_text field values on section lists ---
 
 
-def test_all_conditional_sections_have_boilerplate():
-    """Every CONDITIONAL_SECTIONS entry has boilerplate_text set."""
+def test_all_conditional_sections_have_no_boilerplate():
+    """Every CONDITIONAL_SECTIONS entry has no boilerplate_text (LLM-generated)."""
     for section_def in CONDITIONAL_SECTIONS:
-        assert section_def.boilerplate_text is not None, (
-            f"CONDITIONAL_SECTIONS entry '{section_def.name}' missing boilerplate_text"
+        assert section_def.boilerplate_text is None, (
+            f"CONDITIONAL_SECTIONS entry '{section_def.name}' should not have boilerplate_text"
         )
 
 

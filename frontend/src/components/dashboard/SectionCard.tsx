@@ -148,7 +148,7 @@ export function SectionCard({ section, onApprove, onEdit, onSave, onCancel, onRe
                   Edit
                 </button>
               )}
-              {(!section.category || section.category === "standard") && (
+              {section.category !== "signature" && (
                 <button
                   disabled={actionsDisabled}
                   onClick={onRegenerate}

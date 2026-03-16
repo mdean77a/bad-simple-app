@@ -831,7 +831,7 @@ async def test_regen_succeeds_on_second_attempt(mock_get_model, mock_search):
 async def test_stream_boilerplate_only_no_llm(mock_get_model):
     """Boilerplate-only sections emit SSE events without calling get_chat_model."""
     sections = [
-        {"id": "sec-1", "name": "Genetic Research"},
+        {"id": "sec-1", "name": "Teen Assent"},
         {"id": "sec-2", "name": "Adult Consent"},
     ]
 
@@ -849,7 +849,7 @@ async def test_stream_boilerplate_only_no_llm(mock_get_model):
 
     chunk_events = [e for e in events if e["event"] == "section_chunk"]
     assert len(chunk_events) == 2
-    assert "[Boilerplate placeholder for Genetic Research]" in chunk_events[0]["data"]["content"]
+    assert "I confirm that I have read this assent document" in chunk_events[0]["data"]["content"]
     assert "[Boilerplate placeholder for Adult Consent]" in chunk_events[1]["data"]["content"]
 
     complete_events = [e for e in events if e["event"] == "section_complete"]
@@ -892,7 +892,7 @@ async def test_stream_mixed_boilerplate_and_llm(mock_get_model, mock_build_graph
     mock_build_graph.side_effect = build_side_effect
 
     sections = [
-        {"id": "sec-1", "name": "Genetic Research"},
+        {"id": "sec-1", "name": "Adult Consent"},
         {"id": "sec-2", "name": "Purpose of the Study"},
     ]
     raw_events = []

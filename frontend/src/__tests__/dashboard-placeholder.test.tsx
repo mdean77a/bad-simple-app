@@ -776,7 +776,7 @@ describe("Dashboard Page", () => {
 
   // --- Boilerplate / category tests ---
 
-  it("does not show Regenerate button for conditional sections on dashboard", async () => {
+  it("shows Regenerate button for conditional sections on dashboard", async () => {
     localStorage.setItem(
       "user",
       JSON.stringify({ name: "Jane", email: "jane@example.com" })
@@ -801,8 +801,8 @@ describe("Dashboard Page", () => {
     });
 
     expect(
-      screen.queryByRole("button", { name: /regenerate genetic research/i })
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: /regenerate genetic research/i })
+    ).toBeInTheDocument();
     // Approve and Edit should still be present
     expect(
       screen.getByRole("button", { name: /approve genetic research/i })

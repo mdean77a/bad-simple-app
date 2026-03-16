@@ -392,14 +392,14 @@ async def test_regenerate_section_missing_required_fields(client):
 @pytest.mark.asyncio
 async def test_regenerate_boilerplate_section_returns_422(client):
     """Regenerating a boilerplate section returns 422."""
-    payload = {**REGEN_PAYLOAD, "sectionName": "Genetic Research"}
+    payload = {**REGEN_PAYLOAD, "sectionName": "Teen Assent"}
     response = await client.post("/api/v1/sections/regenerate", json=payload)
 
     assert response.status_code == 422
     data = response.json()
     assert data["code"] == "VALIDATION_ERROR"
     assert "Cannot regenerate boilerplate section" in data["detail"]
-    assert "Genetic Research" in data["detail"]
+    assert "Teen Assent" in data["detail"]
 
 
 @pytest.mark.asyncio
