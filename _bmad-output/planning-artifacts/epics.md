@@ -73,6 +73,12 @@ This document provides the complete epic and story breakdown for bmad-simple-app
 - FR38: Coordinator can save the exported ICF locally to their computer (any format)
 - FR39: Exported ICF includes an approval tracking page as the final page listing each section with its approval date, time, and approver identity
 
+**LLM Provider Management**
+- FR44: Coordinator can select an LLM vendor from available providers; deployed environments offer Anthropic and OpenAI; local development environments additionally offer a Local option (LM Studio via ChatOpenAI interface) when enabled via environment variable
+- FR45: Coordinator can select a model for the chosen vendor from a per-vendor model list; model selection is hidden when Local vendor is selected (Local uses whatever model LM Studio is serving)
+- FR46: Vendor and model selection persists for the session and is included in all generation and regeneration API requests; Anthropic is the default vendor
+- FR47: Vendor and model choice is saved in the project file and restored when the project is opened
+
 **User Interface**
 - FR40: Application displays correctly on desktop; responsive layout adapts to smaller screens without specific mobile optimization
 
@@ -96,6 +102,7 @@ This document provides the complete epic and story breakdown for bmad-simple-app
 - NFR9: LLM API requests retry up to 3 times before displaying error to user
 - NFR10: Protocol index connection failure prevents section generation; user notified with specific error message
 - NFR11: PDF extraction failures display specific error identifying problematic document
+- NFR16: System reports available LLM providers based on configured API keys and environment flags; providers without valid configuration are excluded from the list returned to the frontend
 
 **Reliability**
 - NFR12: Project state automatically maintained in memory during session (transparent to user)
@@ -230,6 +237,10 @@ This document provides the complete epic and story breakdown for bmad-simple-app
 | FR37 | Epic 8 | Export as Word/DOCX |
 | FR38 | Epic 8 | Save export locally |
 | FR39 | Epic 8 | Approval tracking page in export |
+| FR44 | Epic 9 | Select LLM vendor (Anthropic/OpenAI/Local) |
+| FR45 | Epic 9 | Select model for chosen vendor |
+| FR46 | Epic 9 | Vendor/model persists for session, included in API requests |
+| FR47 | Epic 9 | Vendor/model saved in project file, restored on open |
 
 ## Epic List
 
@@ -365,6 +376,26 @@ This document provides the complete epic and story breakdown for bmad-simple-app
 - xhtml2pdf for PDF conversion (replaced weasyprint — weasyprint requires system C libraries incompatible with Vercel/Render deployment)
 - Export buttons in Action Bar (PDF/Word/Markdown)
 - Approval tracking page appended to export with page break separator
+
+---
+
+### Epic 9: Multi-Vendor LLM Support
+
+**Goal:** Coordinators can select between LLM vendors (Anthropic, OpenAI) and models; developers can use a local LLM (LM Studio) during development.
+
+**FRs covered:** FR44, FR45, FR46, FR47
+
+**NFRs addressed:** NFR16 (provider availability reporting)
+
+**Additional Requirements:**
+- Expand `llm_factory.py` to support three providers: `"anthropic"` → ChatAnthropic, `"openai"` → ChatOpenAI, `"local"` → ChatOpenAI with base_url override
+- Add `enable_local_llm` and `local_llm_base_url` to config.py
+- GET /api/v1/settings/providers endpoint (filtered by configured API keys + env flags)
+- Generation/regeneration endpoints accept optional `provider`/`model` overrides
+- Dashboard settings UI: vendor dropdown + model selector
+- Vendor/model stored in project file (`llmProvider`, `llmModel` fields)
+- No new dependencies — `langchain-openai` already installed; LM Studio uses ChatOpenAI interface
+- Anthropic remains the default vendor
 
 ---
 
@@ -2181,3 +2212,216 @@ So that **I can quickly get the document I need**.
 - Toast notifications: simple state-based toast in DashboardPage, auto-dismiss after 3s, no external library
 - Concurrent exports: ActionBar tracks exporting formats in a Set, allows multiple simultaneous exports
 - No separate ExportButton component created — export button logic integrated directly into ActionBar
+
+## Epic 9: Multi-Vendor LLM Support
+
+**Goal:** Coordinators can select between LLM vendors (Anthropic, OpenAI) and models; developers can use a local LLM (LM Studio) during development.
+
+---
+
+### Story 9.1: Expand LLM Factory for Multi-Provider Support
+
+As a **developer**,
+I want **the backend to support multiple LLM providers (Anthropic, OpenAI, Local)**,
+So that **the system can route generation requests to the user's chosen provider**.
+
+**Acceptance Criteria:**
+
+**Given** the server is configured with `LLM_PROVIDER=anthropic` and a valid `ANTHROPIC_API_KEY`
+**When** `get_chat_model()` is called with no overrides
+**Then** it returns a `ChatAnthropic` instance with the configured model
+
+**Given** `get_chat_model()` is called with `provider="openai"` and `model="gpt-5.1"`
+**When** a valid `OPENAI_API_KEY` is configured
+**Then** it returns a `ChatOpenAI` instance with model `gpt-5.1`
+
+**Given** `get_chat_model()` is called with `provider="local"`
+**When** `ENABLE_LOCAL_LLM=true` and `LOCAL_LLM_BASE_URL` is configured
+**Then** it returns a `ChatOpenAI` instance with `base_url` set to the configured URL
+**And** model parameter is ignored (Local uses whatever LM Studio is serving)
+
+**Given** `get_chat_model()` is called with `provider="local"`
+**When** `ENABLE_LOCAL_LLM=false` or not set
+**Then** it raises an error indicating local LLM is not enabled
+
+**Given** `get_chat_model()` is called with `provider="openai"`
+**When** no `OPENAI_API_KEY` is configured
+**Then** it raises an error indicating the API key is missing
+
+**Given** the config.py Settings class
+**When** loaded from environment
+**Then** it includes `enable_local_llm: bool = False` and `local_llm_base_url: str = "http://localhost:1234/v1"`
+**And** `openai_api_key` comment reflects dual-purpose use (embeddings + LLM)
+
+**Technical Notes:**
+
+- Modify `backend/src/services/llm_factory.py` — expand `get_chat_model()` to accept optional `provider` and `model` parameters
+- Three code paths: `"anthropic"` → `ChatAnthropic(model=..., api_key=...)`, `"openai"` → `ChatOpenAI(model=..., api_key=...)`, `"local"` → `ChatOpenAI(model="local", base_url=settings.local_llm_base_url)`
+- Modify `backend/src/config.py` — add `enable_local_llm` and `local_llm_base_url` fields
+- No new dependencies — `langchain-openai` already installed
+- Update `backend/tests/test_llm_factory.py` with tests for all three providers
+
+---
+
+### Story 9.2: Provider Availability Endpoint and Generation Overrides
+
+As a **frontend developer**,
+I want **an API endpoint that reports available providers and generation endpoints that accept provider/model overrides**,
+So that **the frontend can offer the correct vendor/model choices and route requests accordingly**.
+
+**Acceptance Criteria:**
+
+**Given** the server has `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` configured
+**When** I call `GET /api/v1/settings/providers`
+**Then** it returns `{ "providers": ["anthropic", "openai"] }`
+
+**Given** the server has `ENABLE_LOCAL_LLM=true`
+**When** I call `GET /api/v1/settings/providers`
+**Then** the response includes `"local"` in the providers list
+
+**Given** the server has no `OPENAI_API_KEY` configured
+**When** I call `GET /api/v1/settings/providers`
+**Then** `"openai"` is excluded from the providers list (NFR16)
+
+**Given** I call `POST /api/v1/sections/generate` with `provider: "openai"` and `model: "gpt-5.1"` in the request body
+**When** the generation runs
+**Then** it uses the specified provider and model instead of server defaults
+
+**Given** I call `POST /api/v1/sections/regenerate` with `provider: "openai"` and `model: "gpt-5.1"` in the request body
+**When** the regeneration runs
+**Then** it uses the specified provider and model instead of server defaults
+
+**Given** I call a generation endpoint with no `provider` or `model` fields
+**When** the generation runs
+**Then** it uses the server default provider and model (Anthropic)
+
+**Technical Notes:**
+
+- Create `backend/src/api/routes/settings.py` with `GET /providers` endpoint
+- Register settings router in `main.py`
+- Check for API key presence (not validity) to determine availability: `settings.anthropic_api_key is not None`, `settings.openai_api_key is not None`
+- Check `settings.enable_local_llm` for local provider visibility
+- Modify `sections.py` route handlers — add optional `provider` and `model` fields to generate/regenerate request models
+- Pass `provider`/`model` through to `section_graph.py` → `section_generator.py` → `llm_factory.get_chat_model()`
+- Create `backend/tests/test_settings.py` with provider availability tests
+
+---
+
+### Story 9.3: Frontend Settings UI for Vendor/Model Selection
+
+As a **research coordinator**,
+I want **to choose which AI vendor and model to use from the dashboard**,
+So that **I can use my preferred provider for ICF generation**.
+
+**Acceptance Criteria:**
+
+**Given** I am on the dashboard page
+**When** the page loads
+**Then** it fetches available providers from `GET /api/v1/settings/providers`
+**And** displays a vendor dropdown with the available options
+
+**Given** I select "OpenAI" from the vendor dropdown
+**When** the vendor changes
+**Then** the model dropdown updates to show OpenAI models (e.g., gpt-5.1, gpt-5.1-mini-2025-04-14)
+**And** the first model is selected by default
+
+**Given** I select "Local" from the vendor dropdown
+**When** the vendor changes
+**Then** the model dropdown is hidden (FR45)
+**And** a note indicates "Uses whatever model LM Studio is serving"
+
+**Given** I select "Anthropic" from the vendor dropdown
+**When** the vendor changes
+**Then** the model dropdown shows Anthropic models (e.g., claude-sonnet-4-6)
+
+**Given** the vendor/model selection is displayed
+**When** no interaction has occurred
+**Then** Anthropic is selected as the default vendor (FR46)
+
+**Given** I select a vendor and model
+**When** I generate or regenerate a section
+**Then** the selected vendor and model are included in the API request body (FR46)
+
+**Given** the settings/providers endpoint returns only `["anthropic"]`
+**When** the UI renders
+**Then** only Anthropic is shown in the vendor dropdown
+
+**Technical Notes:**
+
+- Add settings UI component to dashboard (e.g., `src/components/dashboard/LlmSettings.tsx`)
+- Vendor dropdown populated from `GET /api/v1/settings/providers`
+- Model lists are hardcoded per vendor in frontend (no model discovery API):
+  - Anthropic: `["claude-sonnet-4-6"]`
+  - OpenAI: `["gpt-5.1", "gpt-5.1-mini-2025-04-14"]`
+  - Local: no model list (hidden)
+- Store selection in React context or component state
+- Pass `provider`/`model` to API calls in `src/lib/api.ts` generate/regenerate functions
+- Settings should be accessible but not intrusive — consider a collapsible section or settings icon
+- Add `fetchProviders()` function to `src/lib/api.ts`
+- Add tests in `src/__tests__/` for LlmSettings component and API integration
+
+---
+
+### Story 9.4: Persist Vendor/Model in Project File
+
+As a **research coordinator**,
+I want **my vendor and model choice saved in the project file**,
+So that **when I reopen a project, it remembers which AI provider I was using**.
+
+**Acceptance Criteria:**
+
+**Given** I have selected OpenAI as the vendor and gpt-5.1 as the model
+**When** I save the project
+**Then** the project file includes `"llmProvider": "openai"` and `"llmModel": "gpt-5.1"` (FR47)
+
+**Given** I open a saved project that has `llmProvider` and `llmModel` fields
+**When** the project loads
+**Then** the vendor dropdown is set to the saved provider
+**And** the model dropdown is set to the saved model (FR47)
+
+**Given** I open a saved project from before Epic 9 (no `llmProvider`/`llmModel` fields)
+**When** the project loads
+**Then** the vendor defaults to Anthropic and the model defaults to the server default
+**And** no error is shown (backward compatibility)
+
+**Given** a project was saved with `"llmProvider": "local"` and I open it in a deployed environment where Local is not available
+**When** the project loads
+**Then** the vendor falls back to the default (Anthropic)
+**And** a note or warning indicates the original provider is not available
+
+**Given** the project file version
+**When** saving with vendor/model fields
+**Then** the version is `"1.1"` (updated from `"1.0"`)
+
+**Technical Notes:**
+
+- Update `src/types/project.ts` — add `llmProvider?: string` and `llmModel?: string` to ProjectFile type
+- Update `src/lib/projectFile.ts` — include `llmProvider`/`llmModel` in serialize/deserialize
+- Update `src/lib/project.tsx` — ProjectProvider state includes vendor/model, loaded from file on open
+- Handle backward compatibility: missing fields default to `"anthropic"` / server default model
+- Handle unavailable provider on load: check against fetched providers list, fall back if not available
+- Bump project file version to `"1.1"`
+- Add tests for save/load with vendor/model fields, backward compatibility, and unavailable provider fallback
+
+---
+
+### Epic 9 Summary
+
+| Story | Title | FRs Covered |
+|-------|-------|-------------|
+| 9.1 | Expand LLM Factory for Multi-Provider Support | FR44 (partial) |
+| 9.2 | Provider Availability Endpoint and Generation Overrides | FR44 (partial), FR46 (partial) |
+| 9.3 | Frontend Settings UI for Vendor/Model Selection | FR44, FR45, FR46 |
+| 9.4 | Persist Vendor/Model in Project File | FR47 |
+
+**Total Stories:** 4
+**All FRs Covered:** FR44, FR45, FR46, FR47 ✓
+**NFRs Addressed:** NFR16 ✓
+
+**Implementation Notes:**
+- No new dependencies — `langchain-openai` already installed; LM Studio reuses ChatOpenAI interface with base_url override
+- Anthropic remains the default vendor; existing behavior unchanged when no overrides provided
+- Local option visibility controlled by `ENABLE_LOCAL_LLM` env var — only present in dev environments
+- Model lists hardcoded in frontend per vendor; no model discovery API needed
+- Backward compatible with existing v1.0 project files (missing fields default to Anthropic)
+- Stories are sequenced backend-first (9.1 → 9.2) then frontend (9.3 → 9.4) for clean integration
