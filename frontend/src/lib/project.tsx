@@ -105,6 +105,7 @@ function projectReducer(
         ...state,
         llmProvider: action.payload.provider,
         llmModel: action.payload.model,
+        generatedOutline: null,
       };
     case "UNCONFIRM_OUTLINE":
       return {
