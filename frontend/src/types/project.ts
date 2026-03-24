@@ -46,6 +46,8 @@ export interface ProjectState {
   outline: ConfirmedOutline | null;
   sections: SectionState[];
   generatedOutline: GeneratedOutlineCache | null;
+  llmProvider: string;
+  llmModel: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -57,13 +57,27 @@ export interface OutlineResult {
   sections: OutlineSection[];
 }
 
+export async function fetchProviders(): Promise<{ providers: string[] }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/settings/providers`);
+    if (!response.ok) {
+      return { providers: ["anthropic"] };
+    }
+    return response.json();
+  } catch {
+    return { providers: ["anthropic"] };
+  }
+}
+
 export async function generateOutline(
-  protocolId: string
+  protocolId: string,
+  provider?: string,
+  model?: string,
 ): Promise<OutlineResult> {
   const response = await fetch(`${API_BASE_URL}/api/v1/outline/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ protocolId }),
+    body: JSON.stringify({ protocolId, provider, model }),
   });
 
   if (!response.ok) {

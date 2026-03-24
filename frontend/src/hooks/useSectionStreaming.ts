@@ -4,7 +4,10 @@ import { useEffect, useRef } from "react";
 import { useProject } from "@/lib/project";
 import { streamSections } from "@/lib/sse";
 
-export function useSectionStreaming(): void {
+export function useSectionStreaming(
+  provider?: string,
+  model?: string,
+): void {
   const { project, updateSection } = useProject();
   const startedRef = useRef(false);
   const sectionsRef = useRef(project.sections);
@@ -40,7 +43,9 @@ export function useSectionStreaming(): void {
         for await (const event of streamSections(
           protocolId,
           sectionsInput,
-          controller.signal
+          controller.signal,
+          provider,
+          model,
         )) {
           switch (event.event) {
             case "section_chunk": {

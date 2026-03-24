@@ -164,6 +164,8 @@ export default function DashboardPage() {
             section.content,
             guidance || null,
             controller.signal,
+            project.llmProvider,
+            project.llmModel,
           )) {
             switch (event.event) {
               case "section_chunk":
@@ -195,7 +197,7 @@ export default function DashboardPage() {
     [regenSection, project.protocolId],
   );
 
-  useSectionStreaming();
+  useSectionStreaming(project.llmProvider, project.llmModel);
   const router = useRouter();
   const params = useParams();
   const protocolId = params.id as string;

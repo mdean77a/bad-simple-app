@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import NewProjectPage from "@/app/projects/new/page";
 import { AuthProvider } from "@/lib/auth";
@@ -227,7 +227,8 @@ describe("New Project Page", () => {
     // Open custom dropdown and click the protocol option
     const trigger = await screen.findByLabelText("Select a protocol");
     fireEvent.click(trigger);
-    const option = screen.getByRole("option");
+    const listbox = screen.getByRole("listbox");
+    const option = within(listbox).getByRole("option");
     fireEvent.click(option);
 
     const continueBtn = screen.getByRole("button", { name: /continue/i });

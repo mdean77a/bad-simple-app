@@ -258,7 +258,7 @@ describe("Outline Page", () => {
 
     await waitFor(() => {
       expect(mockGenerateOutline).toHaveBeenCalledWith(
-        "protocol_thapca_20260215"
+        "protocol_thapca_20260215", "anthropic", "claude-sonnet-4-6"
       );
     });
   });

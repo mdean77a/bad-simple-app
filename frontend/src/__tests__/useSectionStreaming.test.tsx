@@ -105,7 +105,9 @@ describe("useSectionStreaming", () => {
           { id: "s1", name: "Purpose" },
           { id: "s2", name: "Risks" },
         ],
-        expect.any(AbortSignal)
+        expect.any(AbortSignal),
+        undefined,
+        undefined,
       );
     });
   });

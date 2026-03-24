@@ -52,12 +52,14 @@ async function* readSSEStream(
 export async function* streamSections(
   protocolId: string,
   sections: { id: string; name: string }[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  provider?: string,
+  model?: string,
 ): AsyncGenerator<SSEEvent> {
   const response = await fetch(`${API_BASE_URL}/api/v1/sections/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ protocolId, sections }),
+    body: JSON.stringify({ protocolId, sections, provider, model }),
     signal,
   });
 
@@ -75,11 +77,13 @@ export async function* streamSectionRegenerate(
   currentContent: string,
   guidance: string | null,
   signal?: AbortSignal,
+  provider?: string,
+  model?: string,
 ): AsyncGenerator<SSEEvent> {
   const response = await fetch(`${API_BASE_URL}/api/v1/sections/regenerate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ protocolId, sectionId, sectionName, currentContent, guidance }),
+    body: JSON.stringify({ protocolId, sectionId, sectionName, currentContent, guidance, provider, model }),
     signal,
   });
 

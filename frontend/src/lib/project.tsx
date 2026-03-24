@@ -40,6 +40,7 @@ type ProjectAction =
     }
   | { type: "SET_PROTOCOL"; payload: { protocolId: string; protocolName: string } }
   | { type: "LOAD_PROJECT"; payload: ProjectState }
+  | { type: "SET_LLM"; payload: { provider: string; model: string } }
   | { type: "UNCONFIRM_OUTLINE" }
   | { type: "RESET" };
 
@@ -49,6 +50,8 @@ const initialState: ProjectState = {
   outline: null,
   sections: [],
   generatedOutline: null,
+  llmProvider: "anthropic",
+  llmModel: "claude-sonnet-4-6",
 };
 
 function projectReducer(
@@ -97,6 +100,12 @@ function projectReducer(
       };
     case "LOAD_PROJECT":
       return action.payload;
+    case "SET_LLM":
+      return {
+        ...state,
+        llmProvider: action.payload.provider,
+        llmModel: action.payload.model,
+      };
     case "UNCONFIRM_OUTLINE":
       return {
         ...state,
@@ -113,6 +122,7 @@ function projectReducer(
 interface ProjectContextType {
   project: ProjectState;
   setProtocol: (protocolId: string, protocolName: string) => void;
+  setLlm: (provider: string, model: string) => void;
   confirmOutline: (
     protocolId: string,
     outline: ConfirmedOutline,
@@ -137,6 +147,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const setProtocol = (protocolId: string, protocolName: string) => {
     dispatch({ type: "SET_PROTOCOL", payload: { protocolId, protocolName } });
+  };
+
+  const setLlm = (provider: string, model: string) => {
+    dispatch({ type: "SET_LLM", payload: { provider, model } });
   };
 
   const confirmOutline = (
@@ -186,6 +200,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       value={{
         project,
         setProtocol,
+        setLlm,
         confirmOutline,
         loadProject,
         updateSection,
