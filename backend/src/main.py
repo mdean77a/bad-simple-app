@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routes import export, health, outline, protocols, sections
+from src.api.routes import settings as settings_routes
 from src.config import settings
 
 app = FastAPI(
@@ -24,3 +25,4 @@ app.include_router(protocols.router, prefix="/api/v1/protocols", tags=["protocol
 app.include_router(outline.router, prefix="/api/v1/outline", tags=["outline"])
 app.include_router(sections.router, prefix="/api/v1/sections", tags=["sections"])
 app.include_router(export.router, prefix="/api/v1/export", tags=["export"])
+app.include_router(settings_routes.router, prefix="/api/v1/settings", tags=["settings"])

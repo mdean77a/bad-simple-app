@@ -16,6 +16,8 @@ class SectionRequest(BaseModel):
 class GenerateSectionsRequest(BaseModel):
     protocolId: str
     sections: list[SectionRequest]
+    provider: str | None = None
+    model: str | None = None
 
 
 class RegenerateSectionRequest(BaseModel):
@@ -24,6 +26,8 @@ class RegenerateSectionRequest(BaseModel):
     sectionName: str
     currentContent: str
     guidance: str | None = None
+    provider: str | None = None
+    model: str | None = None
 
 
 @router.post("/generate")
@@ -38,7 +42,8 @@ async def generate_sections_endpoint(request: GenerateSectionsRequest):
     async def event_generator():
         sections_input = [{"id": s.id, "name": s.name} for s in request.sections]
         async for event_str in stream_sections_parallel(
-            request.protocolId, sections_input
+            request.protocolId, sections_input,
+            provider=request.provider, model_name=request.model,
         ):
             yield event_str
 
@@ -73,6 +78,8 @@ async def regenerate_section_endpoint(request: RegenerateSectionRequest):
             section_name=request.sectionName,
             current_content=request.currentContent,
             guidance=request.guidance,
+            provider=request.provider,
+            model_name=request.model,
         ):
             yield event_str
 

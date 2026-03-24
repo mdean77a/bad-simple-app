@@ -13,6 +13,8 @@ router = APIRouter()
 
 class GenerateOutlineRequest(BaseModel):
     protocolId: str
+    provider: str | None = None
+    model: str | None = None
 
 
 @router.post("/generate")
@@ -22,7 +24,10 @@ async def generate_outline_endpoint(request: GenerateOutlineRequest) -> dict:
         return _validation_error("protocolId is required")
 
     try:
-        sections = await asyncio.to_thread(generate_outline, request.protocolId)
+        sections = await asyncio.to_thread(
+            generate_outline, request.protocolId,
+            provider=request.provider, model_name=request.model,
+        )
     except VectorStoreError as exc:
         return _vector_db_error(str(exc))
     except (OutlineGenerationError, LLMConfigError) as exc:
