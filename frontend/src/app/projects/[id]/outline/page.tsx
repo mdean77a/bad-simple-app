@@ -63,7 +63,7 @@ export default function OutlinePage() {
           : "Failed to generate outline. Please try again.";
       setState({ status: "error", message });
     }
-  }, [protocolId, cacheGeneratedOutline]);
+  }, [protocolId, cacheGeneratedOutline, project.llmProvider, project.llmModel]);
 
   useEffect(() => {
     if (user && protocolId && !cached) {

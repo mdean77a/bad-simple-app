@@ -20,6 +20,8 @@ export function useSectionStreaming(
     (s) => s.status === "generating"
   );
   const protocolId = project.protocolId;
+  const effectiveProvider = provider ?? "";
+  const effectiveModel = model ?? "";
 
   useEffect(() => {
     if (!hasGenerating || !protocolId) return;
@@ -44,8 +46,8 @@ export function useSectionStreaming(
           protocolId,
           sectionsInput,
           controller.signal,
-          provider,
-          model,
+          effectiveProvider || undefined,
+          effectiveModel || undefined,
         )) {
           switch (event.event) {
             case "section_chunk": {
@@ -84,5 +86,5 @@ export function useSectionStreaming(
       controller.abort();
       startedRef.current = false;
     };
-  }, [hasGenerating, protocolId]);
+  }, [hasGenerating, protocolId, effectiveProvider, effectiveModel]);
 }
