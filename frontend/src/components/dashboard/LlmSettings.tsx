@@ -15,26 +15,22 @@ interface LlmSettingsProps {
   provider: string;
   model: string;
   providers: string[];
-  onProviderChange: (provider: string) => void;
-  onModelChange: (model: string) => void;
+  onChange: (provider: string, model: string) => void;
 }
 
 export function LlmSettings({
   provider,
   model,
   providers,
-  onProviderChange,
-  onModelChange,
+  onChange,
 }: LlmSettingsProps) {
   const models = PROVIDER_MODELS[provider];
   const isLocal = provider === "local";
 
   const handleProviderChange = (newProvider: string) => {
-    onProviderChange(newProvider);
     const newModels = PROVIDER_MODELS[newProvider];
-    if (newModels && newModels.length > 0) {
-      onModelChange(newModels[0]);
-    }
+    const newModel = newModels && newModels.length > 0 ? newModels[0] : "";
+    onChange(newProvider, newModel);
   };
 
   return (
@@ -64,7 +60,7 @@ export function LlmSettings({
           <span className="font-medium">Model</span>
           <select
             value={model}
-            onChange={(e) => onModelChange(e.target.value)}
+            onChange={(e) => onChange(provider, e.target.value)}
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-800"
             data-testid="model-select"
           >

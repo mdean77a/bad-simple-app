@@ -6,8 +6,7 @@ describe("LlmSettings", () => {
     provider: "anthropic",
     model: "claude-sonnet-4-6",
     providers: ["anthropic", "openai"],
-    onProviderChange: jest.fn(),
-    onModelChange: jest.fn(),
+    onChange: jest.fn(),
   };
 
   beforeEach(() => {
@@ -64,27 +63,17 @@ describe("LlmSettings", () => {
     ).toBeInTheDocument();
   });
 
-  it("calls onProviderChange when vendor is selected", () => {
+  it("calls onChange with new provider and its default model when vendor changes", () => {
     render(<LlmSettings {...defaultProps} />);
 
     fireEvent.change(screen.getByTestId("provider-select"), {
       target: { value: "openai" },
     });
 
-    expect(defaultProps.onProviderChange).toHaveBeenCalledWith("openai");
+    expect(defaultProps.onChange).toHaveBeenCalledWith("openai", "gpt-5.1");
   });
 
-  it("auto-selects first model when vendor changes", () => {
-    render(<LlmSettings {...defaultProps} />);
-
-    fireEvent.change(screen.getByTestId("provider-select"), {
-      target: { value: "openai" },
-    });
-
-    expect(defaultProps.onModelChange).toHaveBeenCalledWith("gpt-5.1");
-  });
-
-  it("calls onModelChange when model is selected", () => {
+  it("calls onChange with current provider and new model when model changes", () => {
     render(
       <LlmSettings {...defaultProps} provider="openai" model="gpt-5.1" />
     );
@@ -93,8 +82,8 @@ describe("LlmSettings", () => {
       target: { value: "gpt-5.1-mini-2025-04-14" },
     });
 
-    expect(defaultProps.onModelChange).toHaveBeenCalledWith(
-      "gpt-5.1-mini-2025-04-14"
+    expect(defaultProps.onChange).toHaveBeenCalledWith(
+      "openai", "gpt-5.1-mini-2025-04-14"
     );
   });
 
@@ -121,5 +110,20 @@ describe("LlmSettings", () => {
     const options = select.querySelectorAll("option");
     expect(options).toHaveLength(3);
     expect(options[2]).toHaveTextContent("Local (LM Studio)");
+  });
+
+  it("calls onChange with empty model when switching to local", () => {
+    render(
+      <LlmSettings
+        {...defaultProps}
+        providers={["anthropic", "openai", "local"]}
+      />
+    );
+
+    fireEvent.change(screen.getByTestId("provider-select"), {
+      target: { value: "local" },
+    });
+
+    expect(defaultProps.onChange).toHaveBeenCalledWith("local", "");
   });
 });

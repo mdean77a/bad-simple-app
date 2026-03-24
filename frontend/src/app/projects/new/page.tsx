@@ -96,8 +96,7 @@ export default function NewProjectPage() {
               provider={project.llmProvider}
               model={project.llmModel}
               providers={providers}
-              onProviderChange={(p) => setLlm(p, project.llmModel)}
-              onModelChange={(m) => setLlm(project.llmProvider, m)}
+              onChange={(p, m) => setLlm(p, m)}
             />
           </section>
           <button
