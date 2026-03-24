@@ -37,13 +37,14 @@ function makeProjectState(overrides: Partial<ProjectState> = {}): ProjectState {
     },
     sections: [makeSection()],
     generatedOutline: null,
+    llmProvider: "anthropic",
+    llmModel: "claude-sonnet-4-6",
     ...overrides,
   };
 }
 
 function makeValidProjectFile(overrides: Partial<ProjectFile> = {}): ProjectFile {
   return {
-    version: "1.0",
     protocolId: "proto-abc",
     protocolName: "Test Protocol",
     createdAt: "2026-02-20T10:00:00.000Z",
@@ -119,7 +120,6 @@ describe("extractExtraFields", () => {
   it("does not extract known fields", () => {
     const file = makeValidProjectFile();
     const extra = extractExtraFields(file);
-    expect(extra).not.toHaveProperty("version");
     expect(extra).not.toHaveProperty("protocolId");
     expect(extra).not.toHaveProperty("sections");
   });
@@ -130,12 +130,6 @@ describe("extractExtraFields", () => {
 // ===========================================================================
 
 describe("serializeProject", () => {
-  it("creates a ProjectFile with version 1.0", () => {
-    const state = makeProjectState();
-    const file = serializeProject(state);
-    expect(file.version).toBe("1.0");
-  });
-
   it("includes protocol info from state", () => {
     const state = makeProjectState();
     const file = serializeProject(state);
@@ -383,14 +377,6 @@ describe("validateProjectFile", () => {
     expect(validateProjectFile([]).valid).toBe(false);
   });
 
-  it("rejects missing version", () => {
-    const file = { ...makeValidProjectFile() };
-    delete (file as Record<string, unknown>).version;
-    const result = validateProjectFile(file);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain('Missing required field: "version"');
-  });
-
   it("rejects missing protocolId", () => {
     const file = { ...makeValidProjectFile() };
     delete (file as Record<string, unknown>).protocolId;
@@ -474,14 +460,6 @@ describe("validateProjectFile", () => {
     const result = validateProjectFile(file);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes("status"))).toBe(true);
-  });
-
-  it("warns on unrecognized version but still valid", () => {
-    const file = makeValidProjectFile({ version: "99.0" });
-    const result = validateProjectFile(file);
-    expect(result.valid).toBe(true);
-    expect(result.warnings).toBeDefined();
-    expect(result.warnings!.some((w) => w.includes("version"))).toBe(true);
   });
 
   it("accepts valid sections with approval data", () => {
@@ -801,23 +779,61 @@ describe("readProjectFile", () => {
     );
   });
 
-  it("returns warnings for unrecognized version but still loads", async () => {
-    const projectFile = makeValidProjectFile({ version: "99.0" });
-    const file = createMockFile(JSON.stringify(projectFile));
+});
 
-    const result = await readProjectFile(file);
+describe("llmProvider/llmModel persistence", () => {
+  it("serializeProject includes llmProvider and llmModel", () => {
+    const state = makeProjectState();
+    state.llmProvider = "openai";
+    state.llmModel = "gpt-5.1";
 
-    expect(result.project.protocolId).toBe("proto-abc");
-    expect(result.warnings).toBeDefined();
-    expect(result.warnings![0]).toContain('Unrecognized version "99.0"');
+    const file = serializeProject(state);
+
+    expect(file.llmProvider).toBe("openai");
+    expect(file.llmModel).toBe("gpt-5.1");
   });
 
-  it("returns no warnings for current version", async () => {
-    const projectFile = makeValidProjectFile();
-    const file = createMockFile(JSON.stringify(projectFile));
+  it("serializeProject includes default provider/model", () => {
+    const state = makeProjectState();
 
-    const result = await readProjectFile(file);
+    const file = serializeProject(state);
 
-    expect(result.warnings).toBeUndefined();
+    expect(file.llmProvider).toBe("anthropic");
+    expect(file.llmModel).toBe("claude-sonnet-4-6");
   });
+
+  it("deserializeProject reads llmProvider and llmModel", () => {
+    const file = makeValidProjectFile();
+    file.llmProvider = "openai";
+    file.llmModel = "gpt-5.1";
+
+    const state = deserializeProject(file);
+
+    expect(state.llmProvider).toBe("openai");
+    expect(state.llmModel).toBe("gpt-5.1");
+  });
+
+  it("deserializeProject defaults to anthropic when fields are missing", () => {
+    const file = makeValidProjectFile();
+    delete (file as Record<string, unknown>).llmProvider;
+    delete (file as Record<string, unknown>).llmModel;
+
+    const state = deserializeProject(file);
+
+    expect(state.llmProvider).toBe("anthropic");
+    expect(state.llmModel).toBe("claude-sonnet-4-6");
+  });
+
+  it("round-trips llmProvider and llmModel through serialize/deserialize", () => {
+    const state = makeProjectState();
+    state.llmProvider = "local";
+    state.llmModel = "";
+
+    const file = serializeProject(state);
+    const restored = deserializeProject(file);
+
+    expect(restored.llmProvider).toBe("local");
+    expect(restored.llmModel).toBe("");
+  });
+
 });

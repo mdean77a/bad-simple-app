@@ -115,5 +115,5 @@ development_status:
   9-1-backend-multi-provider-llm-factory: ready-for-dev
   9-2-backend-provider-availability-endpoint: ready-for-dev
   9-3-frontend-vendor-model-settings-ui: ready-for-dev
-  9-4-frontend-persist-vendor-model-in-project-file: backlog
+  9-4-frontend-persist-vendor-model-in-project-file: ready-for-dev
   9-5-integration-testing-all-providers: backlog
