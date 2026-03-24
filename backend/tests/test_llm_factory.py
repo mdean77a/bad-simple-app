@@ -110,6 +110,7 @@ def test_get_chat_model_local(mock_settings, mock_chat_cls):
     mock_chat_cls.assert_called_once_with(
         model="local",
         base_url="http://localhost:1234/v1",
+        api_key="lm-studio",
     )
     assert model == mock_chat_cls.return_value
 

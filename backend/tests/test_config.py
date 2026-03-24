@@ -19,15 +19,17 @@ def test_parse_cors_origins_from_list():
     assert s.cors_origins == ["http://localhost:3000"]
 
 
-def test_enable_local_llm_defaults_false():
-    """enable_local_llm defaults to False."""
-    s = Settings()
+def test_enable_local_llm_defaults_false(monkeypatch):
+    """enable_local_llm defaults to False when env var is not set."""
+    monkeypatch.delenv("ENABLE_LOCAL_LLM", raising=False)
+    s = Settings(_env_file=None)
     assert s.enable_local_llm is False
 
 
-def test_local_llm_base_url_default():
-    """local_llm_base_url defaults to LM Studio default."""
-    s = Settings()
+def test_local_llm_base_url_default(monkeypatch):
+    """local_llm_base_url defaults to LM Studio default when env var is not set."""
+    monkeypatch.delenv("LOCAL_LLM_BASE_URL", raising=False)
+    s = Settings(_env_file=None)
     assert s.local_llm_base_url == "http://localhost:1234/v1"
 
 

@@ -49,6 +49,7 @@ def get_chat_model(
         return ChatOpenAI(
             model="local",
             base_url=settings.local_llm_base_url,
+            api_key="lm-studio",
         )
 
     raise LLMConfigError(f"Unsupported LLM provider: {effective_provider}")
