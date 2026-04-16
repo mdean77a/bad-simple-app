@@ -1,6 +1,6 @@
 # Story 9.4: Persist Vendor/Model in Project File
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

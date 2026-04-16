@@ -1,6 +1,6 @@
 # Story 9.3: Frontend Settings UI for Vendor/Model Selection
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -1,6 +1,6 @@
 # Story 9.1: Expand LLM Factory for Multi-Provider Support
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
