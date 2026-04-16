@@ -5,7 +5,6 @@ import type {
   ProjectFile,
 } from "@/types/project";
 
-const CURRENT_VERSION = "1.0";
 
 /**
  * Sanitizes a string for use as a filename.
@@ -47,13 +46,14 @@ export function downloadProjectFile(
 const PERSISTABLE_STATUSES: PersistableStatus[] = ["ready", "edited", "approved"];
 
 const KNOWN_TOP_LEVEL_KEYS = new Set([
-  "version",
   "protocolId",
   "protocolName",
   "createdAt",
   "lastModifiedAt",
   "outline",
   "sections",
+  "llmProvider",
+  "llmModel",
 ]);
 
 /**
@@ -98,11 +98,12 @@ export function serializeProject(
 
   return {
     ...extraFields,
-    version: CURRENT_VERSION,
     protocolId: project.protocolId,
     protocolName: project.protocolName,
     createdAt: createdAt ?? now,
     lastModifiedAt: now,
+    llmProvider: project.llmProvider,
+    llmModel: project.llmModel,
     outline: project.outline
       ? {
           sections: project.outline.sections,
@@ -154,6 +155,8 @@ export function deserializeProject(file: ProjectFile): ProjectState {
       ...(s.category ? { category: s.category } : {}),
     })),
     generatedOutline: null,
+    llmProvider: file.llmProvider ?? "anthropic",
+    llmModel: file.llmModel ?? "claude-sonnet-4-6",
   };
 }
 
@@ -212,9 +215,6 @@ export function validateProjectFile(
   const obj = data as Record<string, unknown>;
 
   // Required top-level fields
-  if (!obj.version || typeof obj.version !== "string") {
-    errors.push('Missing required field: "version"');
-  }
   if (!obj.protocolId || typeof obj.protocolId !== "string") {
     errors.push('Missing required field: "protocolId"');
   }
@@ -248,19 +248,8 @@ export function validateProjectFile(
     }
   }
 
-  // Version warning
-  if (
-    typeof obj.version === "string" &&
-    obj.version !== CURRENT_VERSION
-  ) {
-    warnings.push(
-      `Unrecognized version "${obj.version}" (current: ${CURRENT_VERSION}). File will be loaded with best effort.`
-    );
-  }
-
   return {
     valid: errors.length === 0,
     errors,
-    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }

@@ -33,7 +33,7 @@ def _sse_event(event: str, data: dict) -> str:
 async def test_generate_sections_success(mock_stream, client):
     """Successful generation emits section_start, section_chunk(s), section_complete."""
 
-    async def fake_stream(protocol_id, sections):
+    async def fake_stream(protocol_id, sections, **kwargs):
         s = sections[0]
         yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
         yield _sse_event("section_chunk", {"sectionId": s["id"], "content": "This study "})
@@ -77,7 +77,7 @@ async def test_generate_sections_success(mock_stream, client):
 async def test_generate_sections_multiple_sections(mock_stream, client):
     """Multiple sections produce events for all sections."""
 
-    async def fake_stream(protocol_id, sections):
+    async def fake_stream(protocol_id, sections, **kwargs):
         for s in sections:
             yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
         for s in sections:
@@ -120,7 +120,7 @@ async def test_generate_sections_multiple_sections(mock_stream, client):
 async def test_generate_sections_error_event(mock_stream, client):
     """Error from streaming yields section_error event."""
 
-    async def fake_stream(protocol_id, sections):
+    async def fake_stream(protocol_id, sections, **kwargs):
         s = sections[0]
         yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
         yield _sse_event(
@@ -153,7 +153,7 @@ async def test_generate_sections_error_event(mock_stream, client):
 async def test_generate_sections_llm_config_error(mock_stream, client):
     """LLMConfigError yields section_error for all sections."""
 
-    async def fake_stream(protocol_id, sections):
+    async def fake_stream(protocol_id, sections, **kwargs):
         for s in sections:
             yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
             yield _sse_event(
@@ -244,7 +244,7 @@ async def test_generate_sections_missing_sections_field(client):
 async def test_generate_sections_sse_event_format(mock_stream, client):
     """SSE events have correct format with event: and data: lines."""
 
-    async def fake_stream(protocol_id, sections):
+    async def fake_stream(protocol_id, sections, **kwargs):
         s = sections[0]
         yield _sse_event("section_start", {"sectionId": s["id"], "name": s["name"]})
         yield _sse_event("section_chunk", {"sectionId": s["id"], "content": "chunk"})
@@ -448,3 +448,99 @@ async def test_regenerate_section_sse_format(mock_stream, client):
     assert "event: section_start\n" in text
     assert "event: section_chunk\n" in text
     assert "event: section_complete\n" in text
+
+
+# --- Provider/model override tests ---
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_with_provider_model(mock_stream, client):
+    """Provider and model are passed through to stream_sections_parallel."""
+
+    async def fake_stream(protocol_id, sections, **kwargs):
+        yield _sse_event("section_start", {"sectionId": "s1", "name": "Purpose"})
+        yield _sse_event("section_complete", {"sectionId": "s1", "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
+
+    response = await client.post(
+        "/api/v1/sections/generate",
+        json={
+            "protocolId": "proto-1",
+            "sections": [{"id": "s1", "name": "Purpose"}],
+            "provider": "openai",
+            "model": "gpt-5.1",
+        },
+    )
+
+    assert response.status_code == 200
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs["provider"] == "openai"
+    assert call_kwargs["model_name"] == "gpt-5.1"
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.sections.stream_sections_parallel")
+async def test_generate_without_provider_model(mock_stream, client):
+    """Missing provider/model passes None (backward compatible)."""
+
+    async def fake_stream(protocol_id, sections, **kwargs):
+        yield _sse_event("section_start", {"sectionId": "s1", "name": "Purpose"})
+        yield _sse_event("section_complete", {"sectionId": "s1", "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
+
+    response = await client.post(
+        "/api/v1/sections/generate",
+        json={
+            "protocolId": "proto-1",
+            "sections": [{"id": "s1", "name": "Purpose"}],
+        },
+    )
+
+    assert response.status_code == 200
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs["provider"] is None
+    assert call_kwargs["model_name"] is None
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.sections.stream_section_regenerate")
+async def test_regenerate_with_provider_model(mock_stream, client):
+    """Provider and model are passed through to stream_section_regenerate."""
+
+    async def fake_stream(**kwargs):
+        sid = kwargs["section_id"]
+        yield _sse_event("section_start", {"sectionId": sid, "name": kwargs["section_name"]})
+        yield _sse_event("section_complete", {"sectionId": sid, "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
+
+    payload = {**REGEN_PAYLOAD, "provider": "openai", "model": "gpt-5.1"}
+    response = await client.post("/api/v1/sections/regenerate", json=payload)
+
+    assert response.status_code == 200
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs["provider"] == "openai"
+    assert call_kwargs["model_name"] == "gpt-5.1"
+
+
+@pytest.mark.asyncio
+@patch("src.api.routes.sections.stream_section_regenerate")
+async def test_regenerate_without_provider_model(mock_stream, client):
+    """Missing provider/model passes None (backward compatible)."""
+
+    async def fake_stream(**kwargs):
+        sid = kwargs["section_id"]
+        yield _sse_event("section_start", {"sectionId": sid, "name": kwargs["section_name"]})
+        yield _sse_event("section_complete", {"sectionId": sid, "status": "ready"})
+
+    mock_stream.side_effect = fake_stream
+
+    response = await client.post("/api/v1/sections/regenerate", json=REGEN_PAYLOAD)
+
+    assert response.status_code == 200
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs["provider"] is None
+    assert call_kwargs["model_name"] is None

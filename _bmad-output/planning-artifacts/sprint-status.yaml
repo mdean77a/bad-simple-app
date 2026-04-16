@@ -108,3 +108,12 @@ development_status:
 
   # Post-Epic Enhancements
   boilerplate-sections: done  # Conditional & signature sections use instant boilerplate text instead of LLM generation
+  conditional-sections-llm: done  # Conditional sections converted from boilerplate to LLM-generated
+
+  # Epic 9: Multi-Vendor LLM Support
+  epic-9: in-progress
+  9-1-backend-multi-provider-llm-factory: done
+  9-2-backend-provider-availability-endpoint: done
+  9-3-frontend-vendor-model-settings-ui: done
+  9-4-frontend-persist-vendor-model-in-project-file: done
+  9-5-integration-testing-all-providers: backlog

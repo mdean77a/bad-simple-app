@@ -107,7 +107,11 @@ def _enforce_order(sections: list[dict]) -> list[dict]:
     return sorted(sections, key=lambda s: order.get(s["sectionName"], 999))
 
 
-def generate_outline(protocol_id: str) -> list[dict]:
+def generate_outline(
+    protocol_id: str,
+    provider: str | None = None,
+    model_name: str | None = None,
+) -> list[dict]:
     """Generate an ICF outline from a protocol using RAG.
 
     Retrieves relevant chunks from Qdrant, sends them to the LLM with
@@ -130,7 +134,7 @@ def generate_outline(protocol_id: str) -> list[dict]:
     context = "\n\n---\n\n".join(chunks)
     prompt = _build_prompt(context)
 
-    model = get_chat_model()
+    model = get_chat_model(provider=provider, model=model_name)
     structured_model = model.with_structured_output(OutlineResult)
 
     # Log prompt and responses for debugging

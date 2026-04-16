@@ -46,7 +46,9 @@ export default function OutlinePage() {
   const loadOutline = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const result = await generateOutline(protocolId);
+      const result = await generateOutline(
+        protocolId, project.llmProvider, project.llmModel
+      );
       const initial: Record<string, boolean> = {};
       result.sections.forEach((s) => {
         initial[s.sectionName] = s.defaultChecked;
@@ -61,7 +63,7 @@ export default function OutlinePage() {
           : "Failed to generate outline. Please try again.";
       setState({ status: "error", message });
     }
-  }, [protocolId, cacheGeneratedOutline]);
+  }, [protocolId, cacheGeneratedOutline, project.llmProvider, project.llmModel]);
 
   useEffect(() => {
     if (user && protocolId && !cached) {

@@ -17,9 +17,13 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str | None = None
 
+    # Local LLM (dev only — LM Studio via ChatOpenAI interface)
+    enable_local_llm: bool = False
+    local_llm_base_url: str = "http://localhost:1234/v1"
+
     qdrant_url: str = ""
     qdrant_api_key: str | None = None
-    openai_api_key: str | None = None
+    openai_api_key: str | None = None  # Used for embeddings AND OpenAI LLM provider
 
     @field_validator("cors_origins", mode="before")
     @classmethod

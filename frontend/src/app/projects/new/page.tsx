@@ -4,13 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useProject } from "@/lib/project";
+import { fetchProviders } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ProtocolUpload } from "@/components/projects/ProtocolUpload";
 import { ProtocolSelect } from "@/components/projects/ProtocolSelect";
+import { LlmSettings } from "@/components/dashboard/LlmSettings";
 
 export default function NewProjectPage() {
   const { user, isLoading } = useAuth();
-  const { setProtocol } = useProject();
+  const { project, setProtocol, setLlm } = useProject();
+  const [providers, setProviders] = useState<string[]>(["anthropic"]);
   const router = useRouter();
   const [hasFileSelected, setHasFileSelected] = useState(false);
   const [uploadedProtocolId, setUploadedProtocolId] = useState<string | null>(
@@ -34,6 +37,10 @@ export default function NewProjectPage() {
       router.replace("/");
     }
   }, [isLoading, user, router]);
+
+  useEffect(() => {
+    fetchProviders().then((result) => setProviders(result.providers));
+  }, []);
 
   const handleUploadSuccess = useCallback((protocolId: string, protocolName: string) => {
     setUploadedProtocolId(protocolId);
@@ -79,6 +86,17 @@ export default function NewProjectPage() {
             <ProtocolSelect
               disabled={hasFileSelected}
               onSelectionChange={handleSelectionChange}
+            />
+          </section>
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">
+              AI Provider
+            </h2>
+            <LlmSettings
+              provider={project.llmProvider}
+              model={project.llmModel}
+              providers={providers}
+              onChange={(p, m) => setLlm(p, m)}
             />
           </section>
           <button

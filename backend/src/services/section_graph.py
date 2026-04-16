@@ -102,6 +102,8 @@ async def stream_section_regenerate(
     section_name: str,
     current_content: str,
     guidance: str | None = None,
+    provider: str | None = None,
+    model_name: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Yield SSE events for regenerating a single section.
 
@@ -113,7 +115,7 @@ async def stream_section_regenerate(
     yield _sse_event("section_start", {"sectionId": section_id, "name": section_name})
 
     try:
-        model = get_chat_model()
+        model = get_chat_model(provider=provider, model=model_name)
     except LLMConfigError as exc:
         yield _sse_event(
             "section_error",
@@ -259,7 +261,10 @@ def build_section_graph(protocol_id, sections, model, node_results):
 
 
 async def stream_sections_parallel(
-    protocol_id: str, sections: list[dict]
+    protocol_id: str,
+    sections: list[dict],
+    provider: str | None = None,
+    model_name: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Yield formatted SSE event strings for all sections in parallel.
 
@@ -294,7 +299,7 @@ async def stream_sections_parallel(
         return
 
     try:
-        model = get_chat_model()
+        model = get_chat_model(provider=provider, model=model_name)
     except LLMConfigError as exc:
         for s in llm_sections:
             yield _sse_event(

@@ -46,6 +46,8 @@ export interface ProjectState {
   outline: ConfirmedOutline | null;
   sections: SectionState[];
   generatedOutline: GeneratedOutlineCache | null;
+  llmProvider: string;
+  llmModel: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,12 +73,13 @@ export interface ProjectFileOutline {
 }
 
 export interface ProjectFile {
-  version: string;
   protocolId: string;
   protocolName: string;
   createdAt: string;
   lastModifiedAt: string;
   outline?: ProjectFileOutline;
   sections: ProjectFileSection[];
+  llmProvider?: string;
+  llmModel?: string;
   [key: string]: unknown; // forward compatibility — preserve unknown fields
 }

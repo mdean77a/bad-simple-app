@@ -1,5 +1,9 @@
 ---
-stepsCompleted: [step-01-init, step-02-discovery, step-03-success, step-04-journeys, step-05-domain, step-06-innovation, step-07-project-type, step-08-scoping, step-09-functional, step-10-nonfunctional, step-11-polish, step-12-complete]
+stepsCompleted: [step-01-init, step-02-discovery, step-03-success, step-04-journeys, step-05-domain, step-06-innovation, step-07-project-type, step-08-scoping, step-09-functional, step-10-nonfunctional, step-11-polish, step-12-complete, step-e-01-discovery, step-e-02-review, step-e-03-edit]
+lastEdited: '2026-03-24'
+editHistory:
+  - date: '2026-03-24'
+    changes: 'Added FR44-FR47 (LLM Provider Management), NFR16 (provider availability), updated MVP scope and journey summary for multi-vendor LLM support (Epic 9)'
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-bmad-simple-app-2026-02-02.md
 documentCounts:
@@ -86,6 +90,7 @@ classification:
 - Save project to local file from dashboard page
 - Export final ICF: save locally (PDF, Markdown, or DOCX)
 - Section approval tracking (user, date, time) printed as final ICF page
+- LLM vendor/model selection (Anthropic default, OpenAI; Local option in dev only)
 
 ### Growth Features (Post-MVP)
 
@@ -219,6 +224,7 @@ Sarah makes the edit, regenerates just the Risks section with guidance to emphas
 | Open project from local file | | ✓ | ✓ | |
 | Approval tracking (user, date, time) | ✓ | ✓ | ✓ | |
 | Local export (PDF, Markdown, DOCX) | ✓ | | ✓ | |
+| LLM vendor/model selection | ✓ | ✓ | ✓ | |
 
 ## Domain-Specific Requirements
 
@@ -382,6 +388,7 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 | Section approval tracking | Accountability documentation |
 | Export final ICF (PDF, Markdown, DOCX) | Output delivery |
 | Simple authentication (name + email) | User identification for approval tracking |
+| LLM vendor/model selection | Multi-provider flexibility; Anthropic default |
 
 ### Post-MVP Features
 
@@ -480,6 +487,13 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 - FR38: Coordinator can save the exported ICF locally to their computer (any format); download triggered via blob URL and anchor click
 - FR39: Exported ICF includes an approval tracking page as the final page listing each section with its approval date, time, and approver identity; separated by page break (horizontal rule in Markdown, CSS page-break in PDF, section break in DOCX)
 
+### LLM Provider Management
+
+- FR44: Coordinator can select an LLM vendor from available providers; deployed environments offer Anthropic and OpenAI; local development environments additionally offer a Local option (LM Studio via ChatOpenAI interface) when enabled via environment variable
+- FR45: Coordinator can select a model for the chosen vendor from a per-vendor model list; model selection is hidden when Local vendor is selected (Local uses whatever model LM Studio is serving)
+- FR46: Vendor and model selection persists for the session and is included in all generation and regeneration API requests; Anthropic is the default vendor
+- FR47: Vendor and model choice is saved in the project file and restored when the project is opened
+
 ### User Interface
 
 - FR40: Application displays correctly on desktop computers
@@ -508,6 +522,7 @@ Note: Journey 4 (PI review) describes downstream workflow context but contribute
 - NFR9: LLM API requests retry up to 3 times before displaying error to user. Note: retry logic is currently implemented for section regeneration only; initial parallel generation attempts once and displays an error on failure.
 - NFR10: Protocol index connection failure prevents section generation; user notified with specific error message
 - NFR11: PDF extraction failures display specific error identifying problematic document
+- NFR16: System reports available LLM providers based on configured API keys and environment flags; providers without valid configuration are excluded from the list returned to the frontend
 
 ### Reliability
 

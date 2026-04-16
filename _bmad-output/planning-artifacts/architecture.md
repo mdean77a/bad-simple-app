@@ -3,6 +3,10 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 status: complete
 completedAt: '2026-02-03'
 lastStep: 8
+lastEdited: '2026-03-24'
+editHistory:
+  - date: '2026-03-24'
+    changes: 'Added multi-vendor LLM support (FR44-47, NFR16): expanded llm_factory to 3 providers, added settings/providers endpoint, provider/model overrides in generation requests, llmProvider/llmModel in project file, updated directory structure and data flows'
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-bmad-simple-app-2026-02-02.md
   - _bmad-output/planning-artifacts/prd.md
@@ -36,6 +40,7 @@ The PRD defines functional requirements across 8 functional areas:
 | Project Management | FR25, FR27, FR29-FR30 | Save to local file, open from file, new project |
 | Approval Tracking | FR31-FR34, FR35a | Section approval records (last approver), approve-all, audit trail |
 | Export & Delivery | FR35-FR39 | LLM→Markdown→PDF/Word export, local save, approval page |
+| LLM Provider Management | FR44-FR47 | Vendor selection (Anthropic/OpenAI/Local), model selection, session persistence, project file storage |
 | User Interface | FR40-FR43 | Desktop/tablet/phone responsive design |
 
 **Non-Functional Requirements:**
@@ -44,7 +49,7 @@ The PRD defines functional requirements across 8 functional areas:
 |----------|------|---------------------|
 | Performance | NFR1-NFR4 | Protocol processing < 1 min, streaming < 10s start, UI < 200ms |
 | Security | NFR5-NFR6 | HTTPS, API key auth for vector DB |
-| Integration | NFR9-NFR11 | LLM retry 3x, graceful degradation, error specificity |
+| Integration | NFR9-NFR11, NFR16 | LLM retry 3x, graceful degradation, error specificity, provider availability reporting |
 | Reliability | NFR12-NFR15 | In-memory state, local file save/resume, save disabled during generation |
 
 **Scale & Complexity:**
@@ -193,7 +198,11 @@ LLM_MODEL=claude-sonnet-4-6
 
 # Provider API Keys
 ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...          # Used for embeddings (OpenAI embeddings API)
+OPENAI_API_KEY=sk-...          # Used for embeddings AND OpenAI LLM provider
+
+# Local LLM (dev only)
+ENABLE_LOCAL_LLM=false                          # Set true in local dev to show Local option
+LOCAL_LLM_BASE_URL=http://localhost:1234/v1     # LM Studio default
 
 # Qdrant Cloud
 QDRANT_URL=https://xxx.qdrant.io
@@ -204,7 +213,7 @@ CORS_ORIGINS=http://localhost:3000
 CORS_ORIGIN_REGEX=...          # Optional regex for additional origins
 ```
 
-**Note:** No database configuration required (no DATABASE_URL, no PostgreSQL credentials). Ollama/LM Studio support was not implemented in MVP.
+**Note:** No database configuration required (no DATABASE_URL, no PostgreSQL credentials).
 
 **Config Pattern (config.py):**
 
@@ -224,10 +233,14 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str | None = None
 
+    # Local LLM (dev only)
+    enable_local_llm: bool = False
+    local_llm_base_url: str = "http://localhost:1234/v1"
+
     # Qdrant & Embeddings
     qdrant_url: str = ""
     qdrant_api_key: str | None = None
-    openai_api_key: str | None = None  # Used for embeddings
+    openai_api_key: str | None = None  # Used for embeddings AND OpenAI LLM provider
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -249,7 +262,7 @@ settings = Settings()
 | Package Manager | npm | uv |
 | AI Orchestration | N/A | LangGraph (state machine workflows) |
 | LLM Framework | N/A | LangChain 1.0+ (configurable provider) |
-| LLM Providers | N/A | Anthropic (primary), OpenAI (embeddings) |
+| LLM Providers | N/A | Anthropic (default), OpenAI (LLM + embeddings), Local/LM Studio (dev only, via ChatOpenAI interface) |
 | Vector DB | N/A | Qdrant Cloud |
 | PDF Processing | N/A | PyMuPDF |
 | Deployment | Vercel | Render / Local |
@@ -309,9 +322,11 @@ settings = Settings()
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "protocolId": "string",
   "protocolName": "string",
+  "llmProvider": "anthropic",
+  "llmModel": "claude-sonnet-4-6",
   "createdAt": "ISO8601",
   "lastModifiedAt": "ISO8601",
   "outline": {
@@ -386,8 +401,9 @@ settings = Settings()
 | POST | `/api/v1/protocols/upload` | Upload PDF, extract text, index in Qdrant; returns `{protocolId, protocolName}` |
 | GET | `/api/v1/protocols` | List indexed protocols; returns `[{protocolId, protocolName, indexedAt}]` |
 | POST | `/api/v1/outline/generate` | Generate outline from protocol ID; returns proposed section checklist |
-| POST | `/api/v1/sections/generate` | SSE stream - generate all sections in parallel; body: `{protocolId, sections: [{id, name}, ...]}` |
-| POST | `/api/v1/sections/regenerate` | SSE stream - regenerate one section; body: `{protocolId, sectionId, sectionName, currentContent, guidance?}` |
+| GET | `/api/v1/settings/providers` | List available LLM providers; returns `{providers: ["anthropic", "openai"]}` (plus `"local"` when `ENABLE_LOCAL_LLM=true`) |
+| POST | `/api/v1/sections/generate` | SSE stream - generate all sections in parallel; body: `{protocolId, sections: [{id, name}, ...], provider?, model?}` |
+| POST | `/api/v1/sections/regenerate` | SSE stream - regenerate one section; body: `{protocolId, sectionId, sectionName, currentContent, guidance?, provider?, model?}` |
 | POST | `/api/v1/export` | Generate export document; body: `{sections: [...], approvals: [...], format: "md"\|"pdf"\|"docx", protocolName: string}`; returns file with Content-Disposition |
 
 **Frontend-Only Operations (no backend call):**
@@ -569,7 +585,7 @@ src/components/
 
 ```text
 src/services/
-├── llm_factory.py            # get_chat_model() — configurable LLM provider
+├── llm_factory.py            # get_chat_model(provider?, model?) — multi-vendor LLM provider (Anthropic/OpenAI/Local)
 ├── rag_pipeline.py           # RAG retrieval for outline and section generation
 ├── section_definitions.py    # Standard ICF section definitions and prompts
 ├── section_generator.py      # Single section generation logic
@@ -578,7 +594,7 @@ src/services/
 └── vector_store.py           # Qdrant operations (index, search, list)
 ```
 
-**Note:** The planned `llm/` subdirectory with per-provider modules was simplified to a single `llm_factory.py` file. The planned `project_state.py` is not implemented (project state is frontend-only). `export_service.py` is implemented with programmatic document assembly (no LLM polishing), xhtml2pdf for PDF, python-docx for DOCX, and lazy imports for deployment flexibility.
+**Note:** The planned `llm/` subdirectory with per-provider modules was simplified to a single `llm_factory.py` file that handles all three providers: `"anthropic"` → `ChatAnthropic`, `"openai"` → `ChatOpenAI`, `"local"` → `ChatOpenAI` with `base_url` override. The factory accepts optional `provider`/`model` overrides for per-request selection from the frontend; defaults come from server config. The planned `project_state.py` is not implemented (project state is frontend-only). `export_service.py` is implemented with programmatic document assembly (no LLM polishing), xhtml2pdf for PDF, python-docx for DOCX, and lazy imports for deployment flexibility.
 
 ### API Response Patterns
 
@@ -821,6 +837,7 @@ class ProjectResponse(ApiModel):
 | Projects (FR25, FR27, FR29-30) | `src/app/page.tsx` (open file), `src/app/projects/new/`, `src/lib/project.tsx`, `src/lib/projectFile.ts` | N/A (frontend-only: save/load local files) |
 | Approvals (FR31-34) | Integrated in dashboard components (`SectionCard`, `ActionBar`, `ApprovalBadge`) | N/A (frontend-only state) |
 | Export (FR35-39) | `ActionBar.tsx` (placeholder buttons) | Not yet implemented (Epic 8 backlog) |
+| LLM Provider (FR44-47) | Dashboard settings UI (vendor/model dropdowns), `lib/project.tsx`, `lib/projectFile.ts` | `src/services/llm_factory.py`, `src/api/routes/settings.py`, generation route overrides |
 | UI Responsive (FR40-43) | Tailwind v4 breakpoints in all components | N/A |
 
 ### Complete Project Directory Structure
@@ -916,7 +933,8 @@ bmad-simple-app/
 │   │   │       ├── health.py          # GET /health
 │   │   │       ├── protocols.py       # POST /upload, GET / (FR4-8)
 │   │   │       ├── outline.py         # POST /generate (FR9-15)
-│   │   │       └── sections.py        # POST /generate, /regenerate (FR16-24)
+│   │   │       ├── sections.py        # POST /generate, /regenerate (FR16-24)
+│   │   │       └── settings.py       # GET /providers (FR44-47, NFR16)
 │   │   │
 │   │   └── services/
 │   │       ├── __init__.py
@@ -965,6 +983,7 @@ bmad-simple-app/
 | `/api/v1/outline/*` | Generate ICF outline from protocol |
 | `/api/v1/sections/*` | Generate sections (SSE), regenerate with guidance (SSE) |
 | `/api/v1/export` | Generate export document (Markdown→PDF/DOCX) with approval tracking page |
+| `/api/v1/settings/*` | Provider availability (FR44-47, NFR16) |
 
 **Service Boundaries:**
 
@@ -976,7 +995,7 @@ bmad-simple-app/
 | `section_definitions` | Standard ICF section definitions and generation prompts | None |
 | `section_generator` | Single section generation logic | LLM, rag_pipeline |
 | `section_graph` | LangGraph state machine for parallel generation + regeneration | section_generator, LangGraph |
-| `llm_factory` | Configurable LLM provider instantiation | langchain-anthropic/openai |
+| `llm_factory` | Multi-vendor LLM provider instantiation; accepts provider/model overrides per request | langchain-anthropic, langchain-openai |
 
 **Data Flow:**
 
@@ -991,14 +1010,19 @@ Outline Generation:
   Returns: [{sectionName, isConditional, defaultChecked}]
 
 Section Generation:
-  Frontend sends: {protocolId, sections: ["Purpose", "Procedures", ...]}
-  Backend: For each section: Qdrant retrieval → LLM → SSE stream
+  Frontend sends: {protocolId, sections: ["Purpose", "Procedures", ...], provider?, model?}
+  Backend: For each section: Qdrant retrieval → LLM (per provider/model) → SSE stream
   Frontend: Accumulates chunks, stores content + originalPrompt per section
 
 Regeneration:
-  Frontend sends: {protocolId, sectionName, originalPrompt, guidance?}
-  Backend: Qdrant retrieval → LLM (prompt + guidance) → SSE stream
+  Frontend sends: {protocolId, sectionName, originalPrompt, guidance?, provider?, model?}
+  Backend: Qdrant retrieval → LLM (prompt + guidance, per provider/model) → SSE stream
   Frontend: Replaces section content
+
+Provider Discovery:
+  Frontend sends: GET /api/v1/settings/providers
+  Backend: Checks configured API keys + ENABLE_LOCAL_LLM flag
+  Returns: {providers: ["anthropic", "openai"]} (plus "local" in dev)
 
 Approval/Edit:
   Frontend-only: Updates local React state (no backend call)
@@ -1052,6 +1076,7 @@ All architectural decisions work together without conflicts:
 | Projects (FR25, FR27, FR29-30) | ✅ | Frontend-only: React state, local file save/load |
 | Approvals (FR31-34, FR35a) | ✅ | Approval tracking in project state, approve-all endpoint |
 | Export (FR35-39) | ✅ | Export service (programmatic Markdown assembly→xhtml2pdf/python-docx), ActionBar export buttons with blob download |
+| LLM Provider (FR44-47) | ✅ | Multi-vendor llm_factory, settings/providers endpoint, vendor/model in project file, dashboard settings UI |
 | UI (FR40-43) | ✅ | Tailwind responsive, three breakpoints defined |
 
 **Non-Functional Requirements:**
@@ -1060,7 +1085,7 @@ All architectural decisions work together without conflicts:
 |----------|--------|-------|
 | NFR1-4 (Performance) | ✅ | SSE streaming pattern, in-memory state |
 | NFR5-6 (Security) | ✅ | HTTPS, API key auth for vector DB |
-| NFR9-11 (Integration) | ✅ | LLM retry pattern (3x), error codes defined |
+| NFR9-11, NFR16 (Integration) | ✅ | LLM retry pattern (3x), error codes defined, provider availability endpoint |
 | NFR12-15 (Reliability) | ✅ | In-memory state, local file save, save disabled during generation |
 
 ### Implementation Readiness ✅

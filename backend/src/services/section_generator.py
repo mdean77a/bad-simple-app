@@ -45,7 +45,10 @@ def _build_user_message(section_name: str) -> str:
 
 
 async def generate_section_stream(
-    protocol_id: str, section_name: str
+    protocol_id: str,
+    section_name: str,
+    provider: str | None = None,
+    model_name: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Stream generated content for a single ICF section.
 
@@ -59,7 +62,7 @@ async def generate_section_stream(
         LLMConfigError: If LLM is not configured.
         SectionGenerationError: If generation fails after MAX_RETRIES attempts.
     """
-    model = get_chat_model()
+    model = get_chat_model(provider=provider, model=model_name)
 
     @tool
     def search_protocol_chunks(query: str) -> str:
