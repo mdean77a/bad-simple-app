@@ -1,6 +1,6 @@
 "use client";
 
-const PROVIDER_LABELS: Record<string, string> = {
+export const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   local: "Local (LM Studio)",

@@ -50,13 +50,20 @@ def _export_body(
     approvals=None,
     fmt="md",
     protocol_name="THAPCA-OH Trial",
+    llm_provider=None,
+    llm_model=None,
 ):
-    return {
+    body = {
         "sections": sections if sections is not None else _SECTIONS,
         "approvals": approvals if approvals is not None else _APPROVALS,
         "format": fmt,
         "protocolName": protocol_name,
     }
+    if llm_provider is not None:
+        body["llmProvider"] = llm_provider
+    if llm_model is not None:
+        body["llmModel"] = llm_model
+    return body
 
 
 # ===================================================================
@@ -187,6 +194,49 @@ class TestBuildApprovalTracking:
         purpose_pos = result.index("Purpose of the Study")
         procedures_pos = result.index("Study Procedures")
         assert purpose_pos < procedures_pos
+
+    def test_disclosure_appended_for_anthropic(self):
+        result = build_approval_tracking(
+            _APPROVALS, _SECTIONS, "anthropic", "claude-sonnet-4-6"
+        )
+        assert (
+            "This document was generated using Anthropic model "
+            "`claude-sonnet-4-6`."
+            in result
+        )
+        # Disclosure follows the table
+        table_pos = result.index("| Section |")
+        disclosure_pos = result.index("This document was generated")
+        assert disclosure_pos > table_pos
+
+    def test_disclosure_appended_for_openai(self):
+        result = build_approval_tracking(
+            _APPROVALS, _SECTIONS, "openai", "gpt-5.1"
+        )
+        assert "OpenAI model `gpt-5.1`" in result
+
+    def test_disclosure_for_local_omits_model(self):
+        result = build_approval_tracking(
+            _APPROVALS, _SECTIONS, "local", ""
+        )
+        assert "Local (LM Studio)" in result
+        assert "determined by the LM Studio runtime" in result
+        assert "`" not in result.split("Approval Tracking")[1].split("Local")[0]
+
+    def test_disclosure_omitted_when_provider_missing(self):
+        result = build_approval_tracking(_APPROVALS, _SECTIONS)
+        assert "This document was generated" not in result
+
+    def test_disclosure_omitted_when_no_approvals(self):
+        # Tracking returns "" when there are no approvals, regardless of LLM args
+        result = build_approval_tracking([], _SECTIONS, "anthropic", "claude-sonnet-4-6")
+        assert result == ""
+
+    def test_disclosure_unknown_provider_falls_back_to_id(self):
+        result = build_approval_tracking(
+            _APPROVALS, _SECTIONS, "custom-provider", "custom-model"
+        )
+        assert "custom-provider model `custom-model`" in result
 
 
 # ===================================================================
@@ -686,3 +736,24 @@ class TestExportRoute:
         md_arg = mock_pdf.call_args[0][0]
         assert "## Approval Tracking" in md_arg
         assert "Sarah Johnson" in md_arg
+
+    @pytest.mark.asyncio
+    async def test_markdown_includes_model_disclosure(self, client):
+        response = await client.post(
+            "/api/v1/export/",
+            json=_export_body(
+                fmt="md",
+                llm_provider="anthropic",
+                llm_model="claude-sonnet-4-6",
+            ),
+        )
+        assert "This document was generated using Anthropic" in response.text
+        assert "claude-sonnet-4-6" in response.text
+
+    @pytest.mark.asyncio
+    async def test_markdown_no_disclosure_when_no_llm_metadata(self, client):
+        response = await client.post(
+            "/api/v1/export/",
+            json=_export_body(fmt="md"),
+        )
+        assert "This document was generated" not in response.text

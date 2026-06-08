@@ -109,6 +109,7 @@ development_status:
   # Post-Epic Enhancements
   boilerplate-sections: done  # Conditional & signature sections use instant boilerplate text instead of LLM generation
   conditional-sections-llm: done  # Conditional sections converted from boilerplate to LLM-generated
+  approval-page-model-disclosure: done  # Append a statement to approval tracking page identifying which LLM provider/model was used; also show provider/model under outline-generation spinner
 
   # Epic 9: Multi-Vendor LLM Support
   epic-9: in-progress

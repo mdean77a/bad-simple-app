@@ -285,20 +285,44 @@ describe("exportDocument", () => {
 
     const result = await exportDocument(sections, approvals, "md", "THAPCA");
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `${API_BASE_URL}/api/v1/export/`,
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    expect(call[0]).toBe(`${API_BASE_URL}/api/v1/export/`);
+    const body = JSON.parse(call[1].body);
+    expect(body).toEqual({
+      sections,
+      approvals,
+      format: "md",
+      protocolName: "THAPCA",
+    });
+    expect(call[1]).toEqual(
       expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sections,
-          approvals,
-          format: "md",
-          protocolName: "THAPCA",
-        }),
       })
     );
     expect(result).toBe(fakeBlob);
+  });
+
+  it("includes llmProvider and llmModel in body when provided", async () => {
+    const fakeBlob = new Blob(["# MD content"], { type: "text/markdown" });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    await exportDocument(
+      sections,
+      approvals,
+      "md",
+      "THAPCA",
+      "anthropic",
+      "claude-sonnet-4-6",
+    );
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(call[1].body);
+    expect(body.llmProvider).toBe("anthropic");
+    expect(body.llmModel).toBe("claude-sonnet-4-6");
   });
 
   it("throws ApiError on API error with structured body", async () => {

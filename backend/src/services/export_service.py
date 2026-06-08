@@ -49,15 +49,40 @@ def assemble_markdown(
 # ---------------------------------------------------------------------------
 
 
+_PROVIDER_LABELS: dict[str, str] = {
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "local": "Local (LM Studio)",
+}
+
+
+def _build_model_disclosure(llm_provider: str | None, llm_model: str | None) -> str:
+    if not llm_provider:
+        return ""
+    label = _PROVIDER_LABELS.get(llm_provider, llm_provider)
+    if llm_provider == "local":
+        return (
+            f"This document was generated using {label}; "
+            "the specific model is determined by the LM Studio runtime."
+        )
+    if not llm_model:
+        return f"This document was generated using {label}."
+    return f"This document was generated using {label} model `{llm_model}`."
+
+
 def build_approval_tracking(
     approvals: list[dict[str, str]],
     sections: list[dict[str, str]],
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
 ) -> str:
     """Build an approval tracking Markdown section.
 
     Returns an empty string when *approvals* is empty.
     Each approval dict must have ``sectionId``, ``userName``, ``timestamp``.
     Each section dict must have ``id`` and ``name``.
+    When *llm_provider* is provided, a disclosure statement is appended
+    after the table indicating which provider/model generated the document.
     """
     if not approvals:
         return ""
@@ -80,6 +105,10 @@ def build_approval_tracking(
         *rows,
         "",
     ]
+    disclosure = _build_model_disclosure(llm_provider, llm_model)
+    if disclosure:
+        lines.append(disclosure)
+        lines.append("")
     return "\n".join(lines)
 
 

@@ -125,11 +125,20 @@ export async function exportDocument(
   approvals: ExportApproval[],
   format: ExportFormat,
   protocolName: string,
+  llmProvider?: string,
+  llmModel?: string,
 ): Promise<Blob> {
   const response = await fetch(`${API_BASE_URL}/api/v1/export/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sections, approvals, format, protocolName }),
+    body: JSON.stringify({
+      sections,
+      approvals,
+      format,
+      protocolName,
+      llmProvider,
+      llmModel,
+    }),
   });
 
   if (!response.ok) {

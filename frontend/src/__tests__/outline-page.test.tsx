@@ -98,6 +98,10 @@ describe("Outline Page", () => {
     await waitFor(() => {
       expect(screen.getByText("Generating outline...")).toBeInTheDocument();
     });
+    // Default provider/model from ProjectProvider is anthropic + claude-sonnet-4-6
+    expect(
+      screen.getByText(/Using Anthropic · claude-sonnet-4-6/)
+    ).toBeInTheDocument();
   });
 
   it("renders outline checklist on successful generation", async () => {
