@@ -112,10 +112,10 @@ development_status:
   approval-page-model-disclosure: done  # Append a statement to approval tracking page identifying which LLM provider/model was used; also show provider/model under outline-generation spinner
 
   # Epic 9: Multi-Vendor LLM Support
-  epic-9: in-progress
+  epic-9: done
   9-1-backend-multi-provider-llm-factory: done
   9-2-backend-provider-availability-endpoint: done
   9-3-frontend-vendor-model-settings-ui: done
   9-4-frontend-persist-vendor-model-in-project-file: done
   9-5-dynamic-model-discovery: done
-  9-6-integration-testing-all-providers: backlog
+  9-6-integration-testing-all-providers: dropped  # not needed; existing unit tests + live verification sufficient
