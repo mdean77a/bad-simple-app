@@ -14,6 +14,7 @@ export default function NewProjectPage() {
   const { user, isLoading } = useAuth();
   const { project, setProtocol, setLlm } = useProject();
   const [providers, setProviders] = useState<string[]>(["anthropic"]);
+  const [models, setModels] = useState<Record<string, string[]>>({});
   const router = useRouter();
   const [hasFileSelected, setHasFileSelected] = useState(false);
   const [uploadedProtocolId, setUploadedProtocolId] = useState<string | null>(
@@ -39,7 +40,10 @@ export default function NewProjectPage() {
   }, [isLoading, user, router]);
 
   useEffect(() => {
-    fetchProviders().then((result) => setProviders(result.providers));
+    fetchProviders().then((result) => {
+      setProviders(result.providers);
+      setModels(result.models);
+    });
   }, []);
 
   const handleUploadSuccess = useCallback((protocolId: string, protocolName: string) => {
@@ -96,6 +100,7 @@ export default function NewProjectPage() {
               provider={project.llmProvider}
               model={project.llmModel}
               providers={providers}
+              models={models}
               onChange={(p, m) => setLlm(p, m)}
             />
           </section>

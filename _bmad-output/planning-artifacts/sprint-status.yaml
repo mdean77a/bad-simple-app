@@ -116,4 +116,5 @@ development_status:
   9-2-backend-provider-availability-endpoint: done
   9-3-frontend-vendor-model-settings-ui: done
   9-4-frontend-persist-vendor-model-in-project-file: done
-  9-5-integration-testing-all-providers: backlog
+  9-5-dynamic-model-discovery: done
+  9-6-integration-testing-all-providers: backlog

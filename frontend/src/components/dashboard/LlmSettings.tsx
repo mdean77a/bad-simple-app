@@ -1,10 +1,5 @@
 "use client";
 
-export const PROVIDER_MODELS: Record<string, string[]> = {
-  anthropic: ["claude-sonnet-4-6"],
-  openai: ["gpt-5.1", "gpt-5.1-mini-2025-04-14"],
-};
-
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
@@ -15,6 +10,7 @@ interface LlmSettingsProps {
   provider: string;
   model: string;
   providers: string[];
+  models: Record<string, string[]>;
   onChange: (provider: string, model: string) => void;
 }
 
@@ -22,14 +18,23 @@ export function LlmSettings({
   provider,
   model,
   providers,
+  models,
   onChange,
 }: LlmSettingsProps) {
-  const models = PROVIDER_MODELS[provider];
   const isLocal = provider === "local";
+  const providerModels = models[provider] ?? [];
+  const showStale = !isLocal && model && !providerModels.includes(model);
+  const displayedModels = showStale
+    ? [model, ...providerModels]
+    : providerModels;
 
   const handleProviderChange = (newProvider: string) => {
-    const newModels = PROVIDER_MODELS[newProvider];
-    const newModel = newModels && newModels.length > 0 ? newModels[0] : "";
+    if (newProvider === "local") {
+      onChange(newProvider, "");
+      return;
+    }
+    const newModels = models[newProvider] ?? [];
+    const newModel = newModels.length > 0 ? newModels[0] : "";
     onChange(newProvider, newModel);
   };
 
@@ -55,7 +60,7 @@ export function LlmSettings({
         <span className="text-slate-500 italic">
           Uses whatever model LM Studio is serving
         </span>
-      ) : models ? (
+      ) : displayedModels.length > 0 ? (
         <label className="flex items-center gap-2 text-slate-600">
           <span className="font-medium">Model</span>
           <select
@@ -64,14 +69,18 @@ export function LlmSettings({
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-800"
             data-testid="model-select"
           >
-            {models.map((m) => (
+            {displayedModels.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
           </select>
         </label>
-      ) : null}
+      ) : (
+        <span className="text-slate-500 italic">
+          No models available for this provider
+        </span>
+      )}
     </div>
   );
 }

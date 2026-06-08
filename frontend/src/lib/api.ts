@@ -57,15 +57,24 @@ export interface OutlineResult {
   sections: OutlineSection[];
 }
 
-export async function fetchProviders(): Promise<{ providers: string[] }> {
+export interface ProvidersResponse {
+  providers: string[];
+  models: Record<string, string[]>;
+}
+
+export async function fetchProviders(): Promise<ProvidersResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/settings/providers`);
     if (!response.ok) {
-      return { providers: ["anthropic"] };
+      return { providers: ["anthropic"], models: {} };
     }
-    return response.json();
+    const body = await response.json();
+    return {
+      providers: body.providers ?? ["anthropic"],
+      models: body.models ?? {},
+    };
   } catch {
-    return { providers: ["anthropic"] };
+    return { providers: ["anthropic"], models: {} };
   }
 }
 
