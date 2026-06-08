@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { OutlineChecklist } from "@/components/outline/OutlineChecklist";
 import { ConfirmButton } from "@/components/outline/ConfirmButton";
 import { generateOutline, ApiError, OutlineSection } from "@/lib/api";
+import { PROVIDER_LABELS } from "@/components/dashboard/LlmSettings";
 import type { SectionState } from "@/types/project";
 
 type PageState =
@@ -138,6 +139,13 @@ export default function OutlinePage() {
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
               <p className="mt-4 text-sm font-medium text-violet-700">
                 Generating outline...
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {project.llmProvider === "local"
+                  ? `Using ${PROVIDER_LABELS["local"]}`
+                  : `Using ${PROVIDER_LABELS[project.llmProvider] ?? project.llmProvider}${
+                      project.llmModel ? ` · ${project.llmModel}` : ""
+                    }`}
               </p>
             </div>
           )}

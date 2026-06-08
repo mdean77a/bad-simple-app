@@ -118,7 +118,14 @@ export default function DashboardPage() {
       const filename = `${protocolName}_ICF.${format}`;
 
       try {
-        const blob = await exportDocument(sections, approvals, format, protocolName);
+        const blob = await exportDocument(
+          sections,
+          approvals,
+          format,
+          protocolName,
+          project.llmProvider,
+          project.llmModel,
+        );
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;

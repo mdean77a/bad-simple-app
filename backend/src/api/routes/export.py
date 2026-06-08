@@ -42,6 +42,8 @@ class ExportRequest(BaseModel):
     approvals: list[ExportApproval]
     format: Literal["md", "pdf", "docx"]
     protocolName: str
+    llmProvider: str | None = None
+    llmModel: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +91,9 @@ async def export_document(req: ExportRequest):
         }
         for a in req.approvals
     ]
-    tracking = build_approval_tracking(approvals, sections)
+    tracking = build_approval_tracking(
+        approvals, sections, req.llmProvider, req.llmModel
+    )
     if tracking:
         md_content = md_content + "\n" + tracking
 

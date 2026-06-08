@@ -736,6 +736,8 @@ describe("Dashboard Page", () => {
         ]),
         "pdf",
         expect.any(String),
+        expect.anything(),
+        expect.anything(),
       );
     });
 
