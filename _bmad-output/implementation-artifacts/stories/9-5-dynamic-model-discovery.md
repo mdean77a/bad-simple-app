@@ -1,6 +1,6 @@
 # Story 9.5: Dynamic Model Discovery from Anthropic and OpenAI
 
-Status: in-progress
+Status: done
 
 ## Story
 
