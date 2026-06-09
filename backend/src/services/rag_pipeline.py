@@ -1,7 +1,4 @@
-import json
 import logging
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -137,20 +134,6 @@ def generate_outline(
     model = get_chat_model(provider=provider, model=model_name)
     structured_model = model.with_structured_output(OutlineResult)
 
-    # Log prompt and responses for debugging
-    project_root = Path(__file__).resolve().parents[3]
-    log_path = project_root / "outline_llm.log"
-    log_file = open(log_path, "w")
-    logger.info("LLM prompt/response log: %s", log_path)
-
-    timestamp = datetime.now(timezone.utc).isoformat()
-    log_file.write(f"=== Outline Generation Log — {timestamp} ===\n")
-    log_file.write(f"Protocol: {protocol_id}\n")
-    log_file.write(f"Chunks retrieved: {len(chunks)}\n\n")
-    log_file.write("--- PROMPT ---\n")
-    log_file.write(prompt)
-    log_file.write("\n--- END PROMPT ---\n\n")
-
     last_error: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -158,30 +141,17 @@ def generate_outline(
             sections = [section.model_dump() for section in result.sections]
             ordered = _enforce_order(sections)
 
-            log_file.write(f"--- RESPONSE (attempt {attempt}) ---\n")
-            log_file.write(json.dumps(ordered, indent=2))
-            log_file.write("\n--- END RESPONSE ---\n")
-            log_file.close()
-
             return ordered
         except LLMConfigError:
-            log_file.write(f"--- ATTEMPT {attempt}: LLMConfigError ---\n")
-            log_file.close()
             raise
         except Exception as exc:
             last_error = exc
-            log_file.write(
-                f"--- ATTEMPT {attempt} FAILED: {exc} ---\n\n"
-            )
             logger.warning(
                 "Outline generation attempt %d/%d failed: %s",
                 attempt,
                 MAX_RETRIES,
                 exc,
             )
-
-    log_file.write(f"=== FAILED after {MAX_RETRIES} attempts ===\n")
-    log_file.close()
 
     raise OutlineGenerationError(
         f"Outline generation failed after {MAX_RETRIES} attempts: {last_error}"

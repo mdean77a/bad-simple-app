@@ -35,9 +35,6 @@ htmlcov/
 # Protocol PDFs (test documents)
 protocols/
 
-# Debug logs
-outline_llm.log
-
 # Screenshots
 Screenshot*.pdf
 
